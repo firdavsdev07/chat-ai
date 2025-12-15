@@ -10,70 +10,117 @@ export default function Home() {
   const [threadId, setThreadId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    fetch("/api/threads")
-      .then((res) => res.json())
-      .then(setThreads);
+    loadThreads();
   }, []);
 
   useEffect(() => {
     if (threadId) {
-      fetch(`/api/chat?thread_id=${threadId}`)
-        .then((res) => res.json())
-        .then(setMessages);
+      loadMessages(threadId);
     } else {
       setMessages([]);
     }
   }, [threadId]);
 
+  const loadThreads = async () => {
+    const res = await fetch("/api/threads");
+    const data = await res.json();
+    setThreads(data);
+  };
+
+  const loadMessages = async (id: number) => {
+    const res = await fetch(`/api/chat?thread_id=${id}`);
+    const data = await res.json();
+    setMessages(data);
+  };
+
   const createChat = async () => {
-    setLoading(true);
     const res = await fetch("/api/threads", {
       method: "POST",
-      body: JSON.stringify({ 
-        title: `Yangi chat ${new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}` 
+      body: JSON.stringify({
+        title: `Chat ${new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}`,
       }),
     });
     const newThread = await res.json();
     setThreads([newThread, ...threads]);
     setThreadId(newThread.id);
-    setLoading(false);
   };
 
-  const sendMessage = async () => {
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!threadId || !input.trim()) return;
-    
+
     const userMsg: Message = {
-      id: Date.now(),
-      thread_id: threadId,
-      role: 'user',
+      id: Date.now().toString(),
+      role: "user",
       content: input,
-      created_at: new Date().toISOString(),
     };
-    
+
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
-    setLoading(true);
+    setIsLoading(true);
 
-    await fetch("/api/chat", {
-      method: "POST",
-      body: JSON.stringify({ thread_id: threadId, content: userMsg.content }),
-    });
-    
-    const res = await fetch(`/api/chat?thread_id=${threadId}`);
-    const data = await res.json();
-    setMessages(data);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, userMsg],
+          threadId,
+        }),
+      });
+
+      if (!res.ok || !res.body) throw new Error("Stream xatosi");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let aiText = "";
+
+      // Temporary AI message
+      const aiMsgId = (Date.now() + 1).toString();
+      setMessages((prev) => [...prev, { id: aiMsgId, role: "assistant", content: "" }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n").filter((line) => line.trim());
+
+        for (const line of lines) {
+          if (line.startsWith("0:")) {
+            try {
+              const json = JSON.parse(line.slice(2).trim());
+              if (json.textDelta) {
+                aiText += json.textDelta;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === aiMsgId ? { ...m, content: aiText } : m
+                  )
+                );
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Xato:", error);
+    } finally {
+      setIsLoading(false);
+      // Reload messages from DB
+      if (threadId) await loadMessages(threadId);
+    }
   };
 
   return (
     <div className="flex h-screen bg-gray-50">
       <Threads
         threads={threads}
-        threadId={threadId}
-        loading={loading}
+        activeId={threadId}
         onNew={createChat}
         onSelect={setThreadId}
       />
@@ -81,12 +128,12 @@ export default function Home() {
       <div className="flex-1 flex flex-col">
         {threadId ? (
           <>
-            <Chat messages={messages} loading={loading} />
+            <Chat messages={messages} isLoading={isLoading} />
             <Input
-              value={input}
-              onChange={setInput}
-              onSend={sendMessage}
-              disabled={loading}
+              input={input}
+              onChange={(e) => setInput(e.target.value)}
+              onSubmit={sendMessage}
+              disabled={isLoading}
             />
           </>
         ) : (

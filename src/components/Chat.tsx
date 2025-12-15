@@ -1,6 +1,6 @@
 import { ChatProps } from '@/lib/types';
 
-export default function Chat({ messages, loading }: ChatProps) {
+export default function Chat({ messages, isLoading }: ChatProps) {
   if (messages.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto p-6">
@@ -14,9 +14,9 @@ export default function Chat({ messages, loading }: ChatProps) {
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-4">
-      {messages.map((m, i) => (
+      {messages.map((m) => (
         <div
-          key={i}
+          key={m.id}
           className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
         >
           <div
@@ -26,11 +26,20 @@ export default function Chat({ messages, loading }: ChatProps) {
                 : "bg-gray-100 text-gray-900 border border-gray-300"
             }`}
           >
-            <div className="text-base whitespace-pre-wrap">{m.content}</div>
+            <div className="text-base whitespace-pre-wrap">
+              {m.content}
+              {m.role === "assistant" && m.toolInvocations && (
+                <div className="mt-2 text-sm opacity-70">
+                  {m.toolInvocations.map((tool, i) => (
+                    <div key={i}>🔧 {tool.toolName}</div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ))}
-      {loading && (
+      {isLoading && (
         <div className="flex justify-start">
           <div className="bg-white text-gray-800 border border-gray-200 px-4 py-3 rounded-2xl">
             <div className="flex gap-1">
