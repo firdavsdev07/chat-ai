@@ -1,12 +1,17 @@
+export interface ToolInvocation {
+  toolCallId: string;
+  toolName: string;
+  args?: unknown;
+  state?: "call" | "partial-call" | "result";
+  result?: unknown;
+}
+
 export interface Message {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
-  toolInvocations?: Array<{
-    toolName: string;
-    args?: unknown;
-    result?: unknown;
-  }>;
+  createdAt?: Date;
+  toolInvocations?: ToolInvocation[];
 }
 
 export interface Thread {
