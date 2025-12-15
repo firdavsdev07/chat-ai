@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { streamText, convertToModelMessages, type UIMessage } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { google } from "@ai-sdk/google";
 
 export const maxDuration = 30;
 
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
 
   // AI javobini stream qilish
   const result = streamText({
-    model: openai("gpt-4o-mini"),
+    model: google("gemini-2.5-flash"),
     messages: convertToModelMessages(messages),
     async onFinish({ text }) {
       // AI javobini DB ga saqlash
