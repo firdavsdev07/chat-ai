@@ -3,6 +3,7 @@ import { streamText, convertToModelMessages, type UIMessage, tool } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { executeConfirmedAction } from "@/lib/actions";
+import { excelReadTools } from "@/lib/tools/excelTools";
 
 export const maxDuration = 30;
 
@@ -10,17 +11,34 @@ export const maxDuration = 30;
 const SYSTEM_PROMPT = `Sen yordamchi AI assistantsan. O'zbek va rus tillarida javob bera olasan.
 
 MUHIM QOIDALAR:
+
+## XAvFLI AMALLAR (Thread operations):
 1. Agar foydalanuvchi thread o'chirish, xabarlarni tozalash, yoki boshqa xavfli amal so'rasa - ALBATTA confirmAction tool ni chaqir.
 2. Hech qachon xavfli amalni tasdiqlashsiz bajarma.
 3. Foydalanuvchi tasdiqlashi ("confirmed") kelgandan keyingina executeConfirmedAction ni chaqir.
 4. Agar foydalanuvchi rad etsa ("rejected"), xushmuomala ravishda amal bekor qilinganini ayt.
 
-MAVJUD ACTIONLAR:
+MAVJUD THREAD ACTIONLAR:
 - deleteThread: Thread ni o'chirish (threadId kerak)
 - updateThreadTitle: Thread nomini o'zgartirish (threadId va newTitle kerak)
 - clearMessages: Thread xabarlarini tozalash (threadId kerak)
 
-Foydalanuvchi so'roviga qarab to'g'ri action type ni tanla.`;
+## EXCEL FAYL BILAN ISHLASH:
+Excel faylida quyidagi sheetlar mavjud: Users, Sales, Inventory.
+
+EXCEL TOOLS:
+- listSheets: Barcha sheetlarni ko'rish
+- getCell: Bitta hujayra qiymatini olish (sheet, cell)
+- getCellFormula: Hujayradagi formulani olish (sheet, cell)
+- getRange: Diapazon qiymatlarini olish (sheet, from, to)
+- getSheetData: Butun sheet ma'lumotlarini olish (sheet)
+
+Excel so'rovlariga javob berganda:
+1. Avval listSheets bilan mavjud sheetlarni ko'r
+2. Keyin getRange yoki getCell bilan kerakli ma'lumotni ol
+3. Jadval formatida chiroyli ko'rsat
+
+Foydalanuvchi so'roviga qarab to'g'ri tool ni tanla.`;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -64,60 +82,79 @@ export async function POST(req: Request) {
     ]);
   }
 
-  // AI javobini stream qilish
-  const result = streamText({
-    model: google("gemini-2.5-flash"),
-    system: SYSTEM_PROMPT,
-    messages: convertToModelMessages(messages),
-    tools: {
-      // Confirmation tool - client-side render qilinadi
-      confirmAction: tool({
-        description: `Request user confirmation before performing a dangerous action. 
-          Use this for delete, update, or clear operations.
-          The user will see a confirmation dialog.`,
-        inputSchema: z.object({
-          actionType: z.enum(['deleteThread', 'updateThreadTitle', 'clearMessages'])
-            .describe('Type of dangerous action'),
-          actionTitle: z.string()
-            .describe('Title shown in dialog, e.g., "Thread o\'chirish"'),
-          actionDescription: z.string()
-            .describe('Description of what will happen'),
-          params: z.object({
-            threadId: z.number().optional(),
-            newTitle: z.string().optional(),
+  try {
+    // AI javobini stream qilish
+    const result = streamText({
+      model: google("gemini-2.5-flash"),
+      system: SYSTEM_PROMPT,
+      messages: convertToModelMessages(messages),
+      tools: {
+        // ============================================
+        // CONFIRMATION TOOLS
+        // ============================================
+        
+        // Confirmation tool - client-side render qilinadi
+        confirmAction: tool({
+          description: `Request user confirmation before performing a dangerous action. 
+            Use this for delete, update, or clear operations.
+            The user will see a confirmation dialog.`,
+          inputSchema: z.object({
+            actionType: z.enum(['deleteThread', 'updateThreadTitle', 'clearMessages'])
+              .describe('Type of dangerous action'),
+            actionTitle: z.string()
+              .describe('Title shown in dialog, e.g., "Thread o\'chirish"'),
+            actionDescription: z.string()
+              .describe('Description of what will happen'),
+            params: z.object({
+              threadId: z.number().optional(),
+              newTitle: z.string().optional(),
+            }),
           }),
+          // No execute - this will be handled client-side
         }),
-        // No execute - this will be handled client-side
-      }),
 
-      // Execute tool - server-side bajariladi
-      executeConfirmedAction: tool({
-        description: `Execute a previously confirmed action. Only call after user confirmed.`,
-        inputSchema: z.object({
-          actionType: z.enum(['deleteThread', 'updateThreadTitle', 'clearMessages']),
-          params: z.object({
-            threadId: z.number().optional(),
-            newTitle: z.string().optional(),
+        // Execute tool - server-side bajariladi
+        executeConfirmedAction: tool({
+          description: `Execute a previously confirmed action. Only call after user confirmed.`,
+          inputSchema: z.object({
+            actionType: z.enum(['deleteThread', 'updateThreadTitle', 'clearMessages']),
+            params: z.object({
+              threadId: z.number().optional(),
+              newTitle: z.string().optional(),
+            }),
           }),
+          execute: async ({ actionType, params }) => {
+            console.log("🚀 Executing action:", actionType);
+            const result = await executeConfirmedAction(actionType, params);
+            return result;
+          },
         }),
-        execute: async ({ actionType, params }) => {
-          const result = await executeConfirmedAction(actionType, params);
-          return result;
-        },
-      }),
-    },
-    async onFinish({ text }) {
-      // AI javobini DB ga saqlash (agar matn bo'lsa)
-      if (text && text.trim()) {
-        db.run("INSERT INTO messages (thread_id, role, content) VALUES (?, ?, ?)", [
-          threadId,
-          "assistant",
-          text,
-        ]);
-      }
-    },
-  });
 
-  // Return stream response compatible with @ai-sdk/react v2
-  return result.toUIMessageStreamResponse();
+        // ============================================
+        // EXCEL READ TOOLS
+        // ============================================
+        ...excelReadTools,
+      },
+      async onFinish({ text }) {
+        // AI javobini DB ga saqlash (agar matn bo'lsa)
+        if (text && text.trim()) {
+          console.log("🤖 AI finished:", text.substring(0, 50) + "...");
+          db.run("INSERT INTO messages (thread_id, role, content) VALUES (?, ?, ?)", [
+            threadId,
+            "assistant",
+            text,
+          ]);
+        }
+      },
+      onError: (error) => {
+        console.error("❌ AI Stream Error:", error);
+      },
+    });
+
+    // Return stream response compatible with @ai-sdk/react v2
+    return result.toUIMessageStreamResponse();
+  } catch (error) {
+    console.error("❌ General API Error:", error);
+    return Response.json({ error: "Internal Server Error" }, { status: 500 });
+  }
 }
