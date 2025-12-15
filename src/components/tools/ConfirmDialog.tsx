@@ -1,18 +1,10 @@
 "use client";
 
-import type { ActionType } from "@/lib/tools";
+import type { ActionType, ConfirmActionParams } from "@/lib/tools";
 
 interface ConfirmDialogProps {
   toolCallId: string;
-  args: {
-    actionType: ActionType;
-    actionTitle: string;
-    actionDescription: string;
-    params: {
-      threadId?: number;
-      newTitle?: string;
-    };
-  };
+  args: ConfirmActionParams;
   addToolResult: (result: { toolCallId: string; result: string }) => void;
 }
 
@@ -33,6 +25,11 @@ const actionStyles: Record<ActionType, { icon: string; bgColor: string; borderCo
     bgColor: "bg-orange-50",
     borderColor: "border-orange-200",
   },
+  updateExcelCell: {
+    icon: "📊",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
+  }
 };
 
 export default function ConfirmDialog({ toolCallId, args, addToolResult }: ConfirmDialogProps) {
@@ -80,17 +77,34 @@ export default function ConfirmDialog({ toolCallId, args, addToolResult }: Confi
       </div>
 
       {/* Params info */}
-      {params.threadId && (
-        <div className="mt-3 px-3 py-2 bg-white/60 rounded-lg text-xs text-gray-500">
-          <span className="font-medium">Thread ID:</span> {params.threadId}
-          {params.newTitle && (
-            <>
-              <br />
-              <span className="font-medium">Yangi nom:</span> {params.newTitle}
-            </>
-          )}
-        </div>
-      )}
+      <div className="mt-3 px-3 py-2 bg-white/60 rounded-lg text-xs text-gray-500">
+        {params.threadId && (
+          <div>
+            <span className="font-medium">Thread ID:</span> {params.threadId}
+          </div>
+        )}
+        {params.newTitle && (
+          <div>
+            <span className="font-medium">Yangi nom:</span> {params.newTitle}
+          </div>
+        )}
+        {/* Excel params */}
+        {params.sheet && (
+          <div>
+            <span className="font-medium">Sheet:</span> {params.sheet}
+          </div>
+        )}
+        {params.cell && (
+          <div>
+            <span className="font-medium">Katak:</span> {params.cell}
+          </div>
+        )}
+        {params.value !== undefined && (
+          <div>
+            <span className="font-medium">Yangi qiymat:</span> {String(params.value)}
+          </div>
+        )}
+      </div>
 
       {/* Buttons */}
       <div className="flex gap-2 mt-4 justify-end">

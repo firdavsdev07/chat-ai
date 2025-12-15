@@ -4,6 +4,7 @@ import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { executeConfirmedAction } from "@/lib/actions";
 import { excelReadTools } from "@/lib/tools/excelTools";
+import { confirmActionSchema, executeConfirmedActionSchema } from "@/lib/tools";
 
 export const maxDuration = 30;
 
@@ -12,16 +13,17 @@ const SYSTEM_PROMPT = `Sen yordamchi AI assistantsan. O'zbek va rus tillarida ja
 
 MUHIM QOIDALAR:
 
-## XAvFLI AMALLAR (Thread operations):
-1. Agar foydalanuvchi thread o'chirish, xabarlarni tozalash, yoki boshqa xavfli amal so'rasa - ALBATTA confirmAction tool ni chaqir.
+## XAvFLI AMALLAR (Thread va Excel operations):
+1. Agar foydalanuvchi thread o'chirish, xabarlarni tozalash, yoki EXCEL KATAGINI O'ZGARTIRISHNI so'rasa - ALBATTA confirmAction tool ni chaqir.
 2. Hech qachon xavfli amalni tasdiqlashsiz bajarma.
 3. Foydalanuvchi tasdiqlashi ("confirmed") kelgandan keyingina executeConfirmedAction ni chaqir.
 4. Agar foydalanuvchi rad etsa ("rejected"), xushmuomala ravishda amal bekor qilinganini ayt.
 
-MAVJUD THREAD ACTIONLAR:
-- deleteThread: Thread ni o'chirish (threadId kerak)
-- updateThreadTitle: Thread nomini o'zgartirish (threadId va newTitle kerak)
-- clearMessages: Thread xabarlarini tozalash (threadId kerak)
+MAVJUD ACTIONLAR:
+- deleteThread: Thread ni o'chirish
+- updateThreadTitle: Thread nomini o'zgartirish
+- clearMessages: Thread xabarlarini tozalash
+- updateExcelCell: Excel katagini yangilash (sheet, cell, value kerak)
 
 ## EXCEL FAYL BILAN ISHLASH:
 Excel faylida quyidagi sheetlar mavjud: Users, Sales, Inventory.
@@ -96,33 +98,16 @@ export async function POST(req: Request) {
         // Confirmation tool - client-side render qilinadi
         confirmAction: tool({
           description: `Request user confirmation before performing a dangerous action. 
-            Use this for delete, update, or clear operations.
+            Use this for delete, update, or clear operations, AND FOR EXCEL UPDATES.
             The user will see a confirmation dialog.`,
-          inputSchema: z.object({
-            actionType: z.enum(['deleteThread', 'updateThreadTitle', 'clearMessages'])
-              .describe('Type of dangerous action'),
-            actionTitle: z.string()
-              .describe('Title shown in dialog, e.g., "Thread o\'chirish"'),
-            actionDescription: z.string()
-              .describe('Description of what will happen'),
-            params: z.object({
-              threadId: z.number().optional(),
-              newTitle: z.string().optional(),
-            }),
-          }),
+          inputSchema: confirmActionSchema,
           // No execute - this will be handled client-side
         }),
 
         // Execute tool - server-side bajariladi
         executeConfirmedAction: tool({
           description: `Execute a previously confirmed action. Only call after user confirmed.`,
-          inputSchema: z.object({
-            actionType: z.enum(['deleteThread', 'updateThreadTitle', 'clearMessages']),
-            params: z.object({
-              threadId: z.number().optional(),
-              newTitle: z.string().optional(),
-            }),
-          }),
+          inputSchema: executeConfirmedActionSchema,
           execute: async ({ actionType, params }) => {
             console.log("🚀 Executing action:", actionType);
             const result = await executeConfirmedAction(actionType, params);

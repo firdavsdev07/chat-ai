@@ -3,7 +3,7 @@
  * Uses SheetJS (xlsx) library
  */
 import * as XLSX from "xlsx";
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 
 // Excel file path (hardcoded)
@@ -56,6 +56,14 @@ function loadWorkbook(): XLSX.WorkBook {
   
   const buffer = readFileSync(EXCEL_FILE_PATH);
   return XLSX.read(buffer, { type: "buffer", cellFormula: true });
+}
+
+/**
+ * Save workbook to file
+ */
+function saveWorkbook(wb: XLSX.WorkBook): void {
+  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  writeFileSync(EXCEL_FILE_PATH, buffer);
 }
 
 /**
@@ -145,7 +153,7 @@ function getCellData(cell: XLSX.CellObject | undefined): CellValue {
 // ============================================
 
 /**
- * Get list of all sheets in the workbook
+ * List all sheets in the workbook
  */
 export function listSheets(): SheetInfo[] {
   const wb = loadWorkbook();
@@ -270,4 +278,59 @@ export function getSheetData(sheet: string): RangeResult {
   const endCell = indexToCol(range.e.c) + (range.e.r + 1);
   
   return getRange(sheet, startCell, endCell);
+}
+
+// ============================================
+// WRITE FUNCTIONS
+// ============================================
+
+/**
+ * Update a single cell
+ */
+export function updateCell(sheet: string, cell: string, value: string | number | boolean | null): CellResult {
+  const wb = loadWorkbook();
+  const ws = wb.Sheets[sheet];
+  
+  if (!ws) {
+    throw new Error(`Sheet not found: ${sheet}. Available sheets: ${wb.SheetNames.join(", ")}`);
+  }
+  
+  const cellRef = cell.toUpperCase();
+  
+  // Check if value is a formula (starts with =)
+  if (typeof value === 'string' && value.startsWith('=')) {
+    ws[cellRef] = { f: value.substring(1) };
+  } else {
+    // Create new cell object based on type
+    let cellObj: XLSX.CellObject;
+    if (value === null) {
+        // Need to verify if this effectively deletes/clears the cell
+        // In SheetJS one way to clear is to set type to 'z' (stub) or just delete property?
+        // But simply assigning a value usually works if we follow util
+        // For simplicity:
+        cellObj = { t: 's', v: '' }; // Clear content
+    } else if (typeof value === 'number') {
+        cellObj = { t: 'n', v: value };
+    } else if (typeof value === 'boolean') {
+        cellObj = { t: 'b', v: value };
+    } else {
+        cellObj = { t: 's', v: String(value) };
+    }
+    ws[cellRef] = cellObj;
+  }
+  
+  // Recalculate range if needed (simplified: just ensure range covers this cell)
+  const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+  const cellAddress = XLSX.utils.decode_cell(cellRef);
+  
+  if (range.s.r > cellAddress.r) range.s.r = cellAddress.r;
+  if (range.s.c > cellAddress.c) range.s.c = cellAddress.c;
+  if (range.e.r < cellAddress.r) range.e.r = cellAddress.r;
+  if (range.e.c < cellAddress.c) range.e.c = cellAddress.c;
+  
+  ws["!ref"] = XLSX.utils.encode_range(range);
+  
+  saveWorkbook(wb);
+  
+  return getCell(sheet, cell);
 }

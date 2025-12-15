@@ -4,7 +4,11 @@ import { z } from 'zod';
 // TOOL TYPE DEFINITIONS
 // ============================================
 
-export type ActionType = 'deleteThread' | 'updateThreadTitle' | 'clearMessages';
+export type ActionType = 
+  | 'deleteThread' 
+  | 'updateThreadTitle' 
+  | 'clearMessages' 
+  | 'updateExcelCell';
 
 export interface ConfirmActionParams {
   actionType: ActionType;
@@ -13,6 +17,10 @@ export interface ConfirmActionParams {
   params: {
     threadId?: number;
     newTitle?: string;
+    // Excel params
+    sheet?: string;
+    cell?: string;
+    value?: string | number | boolean;
   };
 }
 
@@ -21,6 +29,10 @@ export interface ExecuteActionParams {
   params: {
     threadId?: number;
     newTitle?: string;
+    // Excel params
+    sheet?: string;
+    cell?: string;
+    value?: string | number | boolean;
   };
 }
 
@@ -29,23 +41,31 @@ export interface ExecuteActionParams {
 // ============================================
 
 export const confirmActionSchema = z.object({
-  actionType: z.enum(['deleteThread', 'updateThreadTitle', 'clearMessages'])
+  actionType: z.enum(['deleteThread', 'updateThreadTitle', 'clearMessages', 'updateExcelCell'])
     .describe('Type of dangerous action'),
   actionTitle: z.string()
-    .describe('Title shown in dialog, e.g., "Thread o\'chirish"'),
+    .describe('Title shown in dialog, e.g., "Thread o\'chirish" or "Excel katakni yangilash"'),
   actionDescription: z.string()
     .describe('Description of what will happen'),
   params: z.object({
     threadId: z.number().optional(),
     newTitle: z.string().optional(),
+    // Excel params
+    sheet: z.string().optional(),
+    cell: z.string().optional(),
+    value: z.union([z.string(), z.number(), z.boolean()]).optional(),
   }),
 });
 
 export const executeConfirmedActionSchema = z.object({
-  actionType: z.enum(['deleteThread', 'updateThreadTitle', 'clearMessages']),
+  actionType: z.enum(['deleteThread', 'updateThreadTitle', 'clearMessages', 'updateExcelCell']),
   params: z.object({
     threadId: z.number().optional(),
     newTitle: z.string().optional(),
+    // Excel params
+    sheet: z.string().optional(),
+    cell: z.string().optional(),
+    value: z.union([z.string(), z.number(), z.boolean()]).optional(),
   }),
 });
 
