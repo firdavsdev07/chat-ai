@@ -32,6 +32,7 @@ EXCEL TOOLS:
 - listSheets: Barcha sheetlarni ko'rish
 - getCell: Bitta hujayra qiymatini olish (sheet, cell)
 - getCellFormula: Hujayradagi formulani olish (sheet, cell)
+- explainFormula: Formulani olish va uni tushuntirib berish (sheet, cell). Agar foydalanuvchi formulani tushuntirishni so'rasa, shu toolni ishlat.
 - getRange: Diapazon qiymatlarini olish (sheet, from, to)
 - getSheetData: Butun sheet ma'lumotlarini olish (sheet)
 

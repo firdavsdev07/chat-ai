@@ -41,6 +41,9 @@ export const getSheetDataSchema = z.object({
   sheet: z.string().describe("The name of the sheet to get all data from"),
 });
 
+// Reuse getCellFormulaSchema for explainFormula
+export const explainFormulaSchema = getCellFormulaSchema;
+
 // ============================================
 // TOOL DEFINITIONS
 // ============================================
@@ -84,8 +87,7 @@ export const getCellTool = tool({
  * Get formula from a cell
  */
 export const getCellFormulaTool = tool({
-  description: `Get the formula from a cell in the Excel file.
-    Use this to understand how a calculated value was computed.
+  description: `Get the formula from a cell in the Excel file without explaining it.
     Returns the formula string if the cell contains a formula, null otherwise.
     Example: getCellFormula("Sales", "E2") returns the formula that calculates the total.`,
   inputSchema: getCellFormulaSchema,
@@ -94,6 +96,24 @@ export const getCellFormulaTool = tool({
       return getCellFormula(sheet, cell);
     } catch (error) {
       throw new Error(`Failed to get formula from ${cell} in ${sheet}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  },
+});
+
+/**
+ * Explain formula in a cell
+ */
+export const explainFormulaTool = tool({
+  description: `Get the formula from a cell AND explain it to the user.
+    Use this tool when the user asks to "explain" or "understand" a formula.
+    Returns the formula string. THE AI MUST THEN GENERATE A HUMAN-READABLE EXPLANATION based on this formula.
+    Example: explainFormula("Sales", "E2") returns the formula, and you should explain what it calculates.`,
+  inputSchema: explainFormulaSchema,
+  execute: async ({ sheet, cell }): Promise<{ sheet: string; cell: string; formula: string | null; hasFormula: boolean }> => {
+    try {
+      return getCellFormula(sheet, cell);
+    } catch (error) {
+      throw new Error(`Failed to explain formula from ${cell} in ${sheet}: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   },
 });
@@ -142,6 +162,7 @@ export const excelReadTools = {
   listSheets: listSheetsTool,
   getCell: getCellTool,
   getCellFormula: getCellFormulaTool,
+  explainFormula: explainFormulaTool,
   getRange: getRangeTool,
   getSheetData: getSheetDataTool,
 };

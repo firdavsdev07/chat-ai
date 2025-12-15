@@ -1,6 +1,6 @@
 // Script to create example.xlsx file
 import * as XLSX from 'xlsx';
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, writeFileSync } from 'fs';
 
 // Ensure data directory exists
 if (!existsSync('data')) {
@@ -23,33 +23,51 @@ const ws1 = XLSX.utils.aoa_to_sheet(usersData);
 XLSX.utils.book_append_sheet(wb, ws1, 'Users');
 
 // Sheet 2: Sales
-const salesData = [
+// Create manually to ensure formulas are correct
+const ws2 = XLSX.utils.aoa_to_sheet([
   ['Month', 'Product', 'Quantity', 'Price', 'Total'],
-  ['January', 'Laptop', 10, 1200, { f: 'C2*D2' }],
-  ['January', 'Phone', 25, 800, { f: 'C3*D3' }],
-  ['February', 'Laptop', 15, 1200, { f: 'C4*D4' }],
-  ['February', 'Phone', 30, 800, { f: 'C5*D5' }],
-  ['March', 'Laptop', 20, 1200, { f: 'C6*D6' }],
-  ['March', 'Phone', 40, 800, { f: 'C7*D7' }],
-  ['', '', '', 'Grand Total:', { f: 'SUM(E2:E7)' }],
-];
-const ws2 = XLSX.utils.aoa_to_sheet(salesData);
+  ['January', 'Laptop', 10, 1200, 0], // Placeholder for total
+  ['January', 'Phone', 25, 800, 0],
+  ['February', 'Laptop', 15, 1200, 0],
+  ['February', 'Phone', 30, 800, 0],
+  ['March', 'Laptop', 20, 1200, 0],
+  ['March', 'Phone', 40, 800, 0],
+  ['', '', '', 'Grand Total:', 0],
+]);
+
+// Set formulas explicitly
+ws2['E2'] = { t: 'n', f: 'C2*D2', v: 12000 };
+ws2['E3'] = { t: 'n', f: 'C3*D3', v: 20000 };
+ws2['E4'] = { t: 'n', f: 'C4*D4', v: 18000 };
+ws2['E5'] = { t: 'n', f: 'C5*D5', v: 24000 };
+ws2['E6'] = { t: 'n', f: 'C6*D6', v: 24000 };
+ws2['E7'] = { t: 'n', f: 'C7*D7', v: 32000 };
+ws2['E8'] = { t: 'n', f: 'SUM(E2:E7)', v: 130000 };
+
 XLSX.utils.book_append_sheet(wb, ws2, 'Sales');
 
 // Sheet 3: Inventory
 const inventoryData = [
   ['Item', 'Category', 'Stock', 'Min Stock', 'Status'],
-  ['Laptop', 'Electronics', 50, 10, { f: 'IF(C2>D2,"OK","Low")' }],
-  ['Phone', 'Electronics', 5, 10, { f: 'IF(C3>D3,"OK","Low")' }],
-  ['Desk', 'Furniture', 30, 5, { f: 'IF(C4>D4,"OK","Low")' }],
-  ['Chair', 'Furniture', 100, 20, { f: 'IF(C5>D5,"OK","Low")' }],
-  ['Monitor', 'Electronics', 8, 15, { f: 'IF(C6>D6,"OK","Low")' }],
+  ['Laptop', 'Electronics', 50, 10, 'OK'],
+  ['Phone', 'Electronics', 5, 10, 'Low'],
+  ['Desk', 'Furniture', 30, 5, 'OK'],
+  ['Chair', 'Furniture', 100, 20, 'OK'],
+  ['Monitor', 'Electronics', 8, 15, 'Low'],
 ];
 const ws3 = XLSX.utils.aoa_to_sheet(inventoryData);
+
+// Inventory formulas
+ws3['E2'] = { t: 's', f: 'IF(C2>D2,"OK","Low")', v: 'OK' };
+ws3['E3'] = { t: 's', f: 'IF(C3>D3,"OK","Low")', v: 'Low' };
+ws3['E4'] = { t: 's', f: 'IF(C4>D4,"OK","Low")', v: 'OK' };
+ws3['E5'] = { t: 's', f: 'IF(C5>D5,"OK","Low")', v: 'OK' };
+ws3['E6'] = { t: 's', f: 'IF(C6>D6,"OK","Low")', v: 'Low' };
+
 XLSX.utils.book_append_sheet(wb, ws3, 'Inventory');
 
 // Write file
-XLSX.writeFile(wb, 'data/example.xlsx');
+const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+writeFileSync('data/example.xlsx', buffer);
 
-console.log('✅ data/example.xlsx created successfully!');
-console.log('Sheets: Users, Sales, Inventory');
+console.log('✅ data/example.xlsx re-created successfully with explicit formulas!');
