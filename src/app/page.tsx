@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import Threads from "@/components/Threads";
 import Chat from "@/components/Chat";
 import Input from "@/components/Input";
@@ -8,20 +10,33 @@ import { Thread, Message } from "@/lib/types";
 export default function Home() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [threadId, setThreadId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+
+  // useChat hook - replaces all manual streaming logic
+  const {
+    messages,
+    sendMessage,
+    status,
+    setMessages,
+  } = useChat({
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+    }),
+    id: threadId?.toString(),
+  });
 
   useEffect(() => {
     loadThreads();
   }, []);
 
+  // Load messages when thread changes
   useEffect(() => {
     if (threadId) {
       loadMessages(threadId);
     } else {
       setMessages([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);
 
   const loadThreads = async () => {
@@ -33,7 +48,16 @@ export default function Home() {
   const loadMessages = async (id: number) => {
     const res = await fetch(`/api/chat?thread_id=${id}`);
     const data = await res.json();
-    setMessages(data);
+    
+    // Convert DB messages to UIMessage format
+    const formattedMessages: UIMessage[] = data.map((msg: any) => ({
+      id: msg.id.toString(),
+      role: msg.role,
+      parts: [{ type: "text", text: msg.content }],
+    }));
+    
+    // Set initial messages for this thread
+    setMessages(formattedMessages);
   };
 
   const createChat = async () => {
@@ -48,73 +72,23 @@ export default function Home() {
     setThreadId(newThread.id);
   };
 
-  const sendMessage = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!threadId || !input.trim()) return;
-
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: input,
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsLoading(true);
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [...messages, userMsg],
-          threadId,
-        }),
-      });
-
-      if (!res.ok || !res.body) throw new Error("Stream xatosi");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let aiText = "";
-
-      // Temporary AI message
-      const aiMsgId = (Date.now() + 1).toString();
-      setMessages((prev) => [...prev, { id: aiMsgId, role: "assistant", content: "" }]);
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n").filter((line) => line.trim());
-
-        for (const line of lines) {
-          if (line.startsWith("0:")) {
-            try {
-              const json = JSON.parse(line.slice(2).trim());
-              if (json.textDelta) {
-                aiText += json.textDelta;
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === aiMsgId ? { ...m, content: aiText } : m
-                  )
-                );
-              }
-            } catch (e) {
-              // Ignore parse errors
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Xato:", error);
-    } finally {
-      setIsLoading(false);
-      // Reload messages from DB
-      if (threadId) await loadMessages(threadId);
+    if (input.trim() && threadId) {
+      sendMessage({ text: input });
+      setInput("");
     }
   };
+
+  // Convert UIMessages to our Message format for display
+  const displayMessages: Message[] = messages.map((msg) => ({
+    id: msg.id,
+    role: msg.role as "user" | "assistant",
+    content: msg.parts
+      .filter((part) => part.type === "text")
+      .map((part) => "text" in part ? part.text : "")
+      .join(""),
+  }));
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -128,12 +102,12 @@ export default function Home() {
       <div className="flex-1 flex flex-col">
         {threadId ? (
           <>
-            <Chat messages={messages} isLoading={isLoading} />
+            <Chat messages={displayMessages} isLoading={status === "streaming"} />
             <Input
               input={input}
               onChange={(e) => setInput(e.target.value)}
-              onSubmit={sendMessage}
-              disabled={isLoading}
+              onSubmit={handleSubmit}
+              disabled={status !== "ready"}
             />
           </>
         ) : (

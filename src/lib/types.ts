@@ -1,7 +1,8 @@
 export interface Message {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
+  createdAt?: Date;
   toolInvocations?: Array<{
     toolName: string;
     args?: unknown;
