@@ -1,33 +1,34 @@
+export interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  toolInvocations?: Array<{
+    toolName: string;
+    args?: unknown;
+    result?: unknown;
+  }>;
+}
+
 export interface Thread {
   id: number;
   title: string;
-  created_at: string;
-}
-
-export interface Message {
-  id: number;
-  thread_id: number;
-  role: 'user' | 'assistant';
-  content: string;
-  created_at: string;
 }
 
 export interface ThreadsProps {
   threads: Thread[];
-  threadId: number | null;
-  loading: boolean;
+  activeId: number | null;
   onNew: () => void;
   onSelect: (id: number) => void;
 }
 
 export interface ChatProps {
   messages: Message[];
-  loading: boolean;
+  isLoading: boolean;
 }
 
 export interface InputProps {
-  value: string;
-  onChange: (value: string) => void;
-  onSend: () => void;
+  input: string;
+  onSubmit: (e: React.FormEvent) => void;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   disabled: boolean;
 }
