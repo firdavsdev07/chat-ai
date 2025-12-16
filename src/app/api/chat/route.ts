@@ -4,7 +4,7 @@ import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { executeConfirmedAction } from "@/lib/actions";
 import { excelReadTools } from "@/lib/tools/excelTools";
-import { confirmActionSchema, executeConfirmedActionSchema } from "@/lib/tools";
+import { confirmActionSchema, executeConfirmedActionSchema, showTableSchema } from "@/lib/tools";
 
 export const maxDuration = 30;
 
@@ -36,6 +36,12 @@ EXCEL TOOLS:
 - getRange: Diapazon qiymatlarini olish (sheet, from, to)
 - getSheetData: Butun sheet ma'lumotlarini olish (sheet)
 
+## VISUAL JADVAL (showTable):
+Agar foydalanuvchi jadval ma'lumotlarini so'rasa yoki "ko'rsat" desa (ayniqsa mention bilan), Markdown jadval o'rniga \`showTable\` toolini ishlatish afzal.
+Buning uchun:
+1. Avval kerakli ma'lumotni \`getRange\` yoki \`getSheetData\` bilan ol (o'zing uchun).
+2. Keyin \`showTable(sheet, data, range)\` toolini chaqirib foydalanuvchiga vizual ko'rsat.
+
 ## MENTION TIZIMI (MUHIM!):
 Foydalanuvchi Excel hujayralariga MENTION formatida havola qilishi mumkin:
 - Bitta hujayra: @SheetName!A1 (masalan: @Users!B2)
@@ -43,12 +49,14 @@ Foydalanuvchi Excel hujayralariga MENTION formatida havola qilishi mumkin:
 
 Agar xabarda @SheetName!Cell yoki @SheetName!From:To formatidagi mention bo'lsa:
 1. Mention ni parse qil: sheet=SheetName, from=Cell/From, to=To (yoki from bilan bir xil)
-2. getRange(sheet, from, to) tool ni chaqir
-3. Natijani jadval formatida chiroyli ko'rsat
+2. getRange(sheet, from, to) tool ni chaqirib ma'lumotni ol.
+3. Natijani \`showTable\` orqali vizual ko'rsat (afzal) yoki Markdown jadval qilib ber.
 
 Misol:
 - Foydalanuvchi: "@Users!A1:C3 qiymatlarini ko'rsat"
-- Sen: getRange("Users", "A1", "C3") chaqir va natijani jadval sifatida ko'rsat
+- Sen: 
+  1. getRange("Users", "A1", "C3") -> data ni olasan
+  2. showTable("Users", data, {from: "A1", to: "C3"}) -> vizual ko'rsatasan
 
 - Foydalanuvchi: "@Sales!E5 ni tekshir"
 - Sen: getCell("Sales", "E5") chaqir va qiymatni ko'rsat
@@ -58,7 +66,7 @@ Mention siz ham ishlaysan - "Users sheetidagi A1:C3" desa ham getRange chaqir.
 Excel so'rovlariga javob berganda:
 1. Avval mentionlarni parse qil (agar bo'lsa)
 2. getRange yoki getCell bilan kerakli ma'lumotni ol
-3. Jadval formatida chiroyli ko'rsat
+3. showTable bilan visual ko'rsatishga harakat qil
 
 Foydalanuvchi so'roviga qarab to'g'ri tool ni tanla.`;
 
@@ -133,6 +141,14 @@ export async function POST(req: Request) {
             const result = await executeConfirmedAction(actionType, params);
             return result;
           },
+        }),
+
+        // ============================================
+        // UI TOOLS
+        // ============================================
+        showTable: tool({
+          description: "Show data in a visual table modal to the user. Use this when user asks to see data or mentions a range.",
+          inputSchema: showTableSchema,
         }),
 
         // ============================================

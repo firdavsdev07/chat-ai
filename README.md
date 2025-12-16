@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Chat Application (Production Ready)
+
+This is a modern AI chat application built with **Next.js 16**, **Vercel AI SDK**, and **Bun SQLite**.
+It features a ChatGPT-like interface with thread management, message persistence, and advanced Excel integration tools.
+
+## Features
+
+- 💬 **AI Chat**: Powered by Google Gemini 2.5 Flash using Vercel AI SDK v5.
+- 🧵 **Thread Management**: Create, switch, and manage multiple chat threads.
+- 💾 **Persistence**: All messages and threads are saved locally using SQLite (`data/chat.sqlite`).
+- 📊 **Excel Integration**:
+  - **Read/Write**: Full read/write capabilities for Excel files.
+  - **Formula Explanation**: AI can read and explain Excel formulas.
+  - **Mention System**: Reference cells directly in chat using `@Sheet!A1` syntax.
+  - **Visual Table Modal**: Interactive grid for selecting ranges and viewing data.
+- 🛡️ **Safety & Reliability**: 
+  - Dangerous actions (delete/update) require explicit user confirmation via UI.
+  - Robust error handling, timeouts, and retry mechanisms.
+- 🎨 **Modern UX**: 
+  - Clean UI with internal state management.
+  - Real-time streaming responses with typing indicators.
+  - Lucide React icons (no emojis).
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript
+- **Runtime**: Bun 1.1+
+- **Database**: SQLite (via `bun:sqlite`)
+- **AI SDK**: Vercel AI SDK (`useChat`, `streamText`)
+- **Styling**: Tailwind CSS
+- **Icons**: lucide-react
+- **Excel**: SheetJS (xlsx)
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- [Bun](https://bun.sh) installed.
+- Google AI API Key.
+
+### Installation
+
+1. **Clone the repository** (if applicable):
+   ```bash
+   git clone <repository-url>
+   cd ai-chat-test2
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   bun install
+   ```
+
+3. **Environment Setup**:
+   Create a `.env.local` file in the root directory:
+   ```env
+   GOOGLE_GENERATIVE_AI_API_KEY=your_api_key_here
+   ```
+
+4. **Data Setup**:
+   Ensure `data/example.xlsx` exists in the project root. This file is used for all Excel operations.
+
+### Running the App
+
+Start the development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+├── app/
+│   ├── api/             # API Routes (Chat, Threads, Excel)
+│   └── page.tsx         # Main Layout
+├── components/          
+│   ├── ChatArea.tsx     # Main chat logic & UI
+│   ├── MentionInput.tsx # Input with @mention support
+│   ├── TableModal.tsx   # Excel Grid Modal
+│   ├── ExcelGrid.tsx    # Excel Table Implementation
+│   └── tools/           # Generative UI Components
+├── hooks/               # Custom Hooks (useMention, etc.)
+├── lib/
+│   ├── db.ts            # SQLite Database Connection
+│   ├── excel.ts         # Excel Utility Functions
+│   ├── actions.ts       # Server Actions
+│   └── tools.ts         # Tool Definitions (Zod Schemas)
+```
 
-## Learn More
+## AI Tools & Capabilities
 
-To learn more about Next.js, take a look at the following resources:
+The AI agent has access to the following tools:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **`confirmAction`**: Requests user permission before critical operations.
+- **`listSheets` / `getRange`**: Tools to explore and read Excel data.
+- **`updateExcelCell`**: Modifies Excel data (requires confirmation).
+- **`showTable`**: Displays data in a visual modal instead of raw text.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Development Notes
 
-## Deploy on Vercel
+- The project uses **Bun's built-in SQLite**, so no external DB setup is required.
+- All core logic is strictly typed with **TypeScript**.
+- UX is optimized for reliability: network errors and timeouts are handled gracefully.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+Built with ❤️ using Vercel AI SDK and Next.js.
