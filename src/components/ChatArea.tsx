@@ -1,9 +1,16 @@
 "use client";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai";
-import { useState, useEffect } from "react";
-import Input from "@/components/Input";
+import { useState, useEffect, useCallback } from "react";
+import MentionInput from "@/components/MentionInput";
 import ConfirmDialog from "@/components/tools/ConfirmDialog";
+import type { Mention } from "@/lib/mentionParser";
+
+// Sheet data type
+interface SheetData {
+  name: string;
+  data: (string | number | boolean | null)[][];
+}
 
 interface ChatAreaProps {
   threadId: number;
@@ -11,6 +18,8 @@ interface ChatAreaProps {
 
 export default function ChatArea({ threadId }: ChatAreaProps) {
   const [input, setInput] = useState("");
+  const [sheets, setSheets] = useState<SheetData[]>([]);
+  const [sheetsLoaded, setSheetsLoaded] = useState(false);
   
   const {
     messages,
@@ -29,6 +38,7 @@ export default function ChatArea({ threadId }: ChatAreaProps) {
   // Load messages when component mounts
   useEffect(() => {
     loadMessages();
+    loadSheets();
   }, []);
 
   const loadMessages = async () => {
@@ -44,6 +54,27 @@ export default function ChatArea({ threadId }: ChatAreaProps) {
       setMessages(formattedMessages);
     }
   };
+
+  // Load Excel sheets for mention system
+  const loadSheets = async () => {
+    try {
+      const res = await fetch('/api/excel/sheets');
+      if (res.ok) {
+        const data = await res.json();
+        setSheets(data.sheets || []);
+      }
+    } catch (error) {
+      console.error('Failed to load sheets:', error);
+    } finally {
+      setSheetsLoaded(true);
+    }
+  };
+
+  // Handle mention changes (for context)
+  const handleMentionsChange = useCallback((mentions: Mention[]) => {
+    // Mentions are parsed in the input - AI will see them in the message
+    console.log('Current mentions:', mentions);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,11 +238,13 @@ export default function ChatArea({ threadId }: ChatAreaProps) {
         )}
       </div>
 
-      <Input
-        input={input}
-        onChange={(e) => setInput(e.target.value)}
+      <MentionInput
+        value={input}
+        onChange={setInput}
         onSubmit={handleSubmit}
         disabled={status !== "ready"}
+        sheets={sheets}
+        onMentionsChange={handleMentionsChange}
       />
     </>
   );
