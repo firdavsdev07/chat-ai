@@ -1,181 +1,215 @@
 import { db } from "@/lib/db";
 import { streamText, convertToModelMessages, type UIMessage, tool } from "ai";
-import { google } from "@ai-sdk/google";
-import { z } from "zod";
+// import { google } from "@ai-sdk/google";
+import { groq } from "@ai-sdk/groq";
 import { executeConfirmedAction } from "@/lib/actions";
 import { excelReadTools } from "@/lib/tools/excelTools";
-import { confirmActionSchema, executeConfirmedActionSchema, showTableSchema } from "@/lib/tools";
+import {
+  confirmActionSchema,
+  executeConfirmedActionSchema,
+  showTableSchema,
+} from "@/lib/tools";
 
 export const maxDuration = 30;
 
-// System prompt with tool instructions
-const SYSTEM_PROMPT = `Sen yordamchi AI assistantsan. O'zbek va rus tillarida javob bera olasan.
+const SYSTEM_PROMPT = `You are a professional AI assistant. You communicate fluently in Uzbek and Russian.
+Your primary function is working with Excel files and analyzing data.
 
-MUHIM QOIDALAR:
+## CRITICAL BEHAVIOR RULES
 
-## XAVFLI AMALLAR (Thread va Excel operations):
-1. Agar foydalanuvchi thread o'chirish, xabarlarni tozalash, yoki EXCEL KATAGINI O'ZGARTIRISHNI so'rasa - ALBATTA confirmAction tool ni chaqir.
-2. Hech qachon xavfli amalni tasdiqlashsiz bajarma.
-3. Foydalanuvchi tasdiqlashi ("confirmed") kelgandan keyingina executeConfirmedAction ni chaqir.
-4. Agar foydalanuvchi rad etsa ("rejected"), xushmuomala ravishda amal bekor qilinganini ayt.
+### RULE #1: WHEN USER WANTS TO MODIFY DATA - CALL TOOL IMMEDIATELY!
 
-MAVJUD ACTIONLAR:
-- deleteThread: Thread ni o'chirish
-- updateThreadTitle: Thread nomini o'zgartirish
-- clearMessages: Thread xabarlarini tozalash
-- updateExcelCell: Excel katagini yangilash (sheet, cell, value kerak)
+YOU MUST NOT:
+- Ask "Alexsandr uchun qanday ID raqamini berasiz?" (WRONG!)
+- Ask "Tasdiqlaysizmi?" or "Ma'qulmi?" (WRONG!)
+- Say "Iltimos, tasdiqlash uchun confirmAction funksiyasini chaqiring" (WRONG!)
+- Ask for any additional information if you have enough data
 
-## EXCEL FAYL BILAN ISHLASH:
-Excel faylida quyidagi sheetlar mavjud: Users, Sales, Inventory.
+YOU MUST:
+- When user says "add/update/delete" → IMMEDIATELY CALL THE TOOL
+- If sheet has ID column → DON'T ask for ID, server generates it automatically
+- Call confirmAction first, then wait for user button click
 
-EXCEL TOOLS:
-- listSheets: Barcha sheetlarni ko'rish
-- getCell: Bitta hujayra qiymatini olish (sheet, cell)
-- getCellFormula: Hujayradagi formulani olish (sheet, cell)
-- explainFormula: Formulani olish va uni tushuntirib berish (sheet, cell). Agar foydalanuvchi formulani tushuntirishni so'rasa, shu toolni ishlat.
-- getRange: Diapazon qiymatlarini olish (sheet, from, to)
-- getSheetData: Butun sheet ma'lumotlarini olish (sheet)
+### RULE #2: CONCRETE EXAMPLES
 
-## VISUAL JADVAL (showTable):
-Agar foydalanuvchi jadval ma'lumotlarini so'rasa yoki "ko'rsat" desa (ayniqsa mention bilan), Markdown jadval o'rniga \`showTable\` toolini ishlatish afzal.
-Buning uchun:
-1. Avval kerakli ma'lumotni \`getRange\` yoki \`getSheetData\` bilan ol (o'zing uchun).
-2. Keyin \`showTable(sheet, data, range)\` toolini chaqirib foydalanuvchiga vizual ko'rsat.
+Example 1 - Add Row:
+User: "Yangi user qo'shamiz: Alexsandr, alex@gmail.com, Developer, 4760"
+❌ WRONG: "Alexsandr uchun qanday ID raqamini berasiz?"
+✅ RIGHT: [IMMEDIATELY CALL confirmAction tool with:
+  actionType: "addExcelRow",
+  actionTitle: "Yangi foydalanuvchi",
+  actionDescription: "Alexsandr (alex@gmail.com, Developer, 4760) qo'shiladi",
+  params: {sheet: "Users", rowData: ["Alexsandr", "alex@gmail.com", "Developer", 4760]}
+]
+Server will auto-generate ID!
 
-## MENTION TIZIMI (MUHIM!):
-Foydalanuvchi Excel hujayralariga MENTION formatida havola qilishi mumkin:
-- Bitta hujayra: @SheetName!A1 (masalan: @Users!B2)
-- Diapazon: @SheetName!A1:C5 (masalan: @Sales!A1:E10)
+Example 2 - Update Cell:
+User: "Firdavsning maoshini 4500 qil"
+❌ WRONG: "Ma'qulmi?"
+✅ RIGHT: [IMMEDIATELY CALL confirmAction tool with:
+  actionType: "updateExcelCell",
+  actionTitle: "Maoshni yangilash",
+  actionDescription: "Firdavs maoshi 4500 ga o'zgaradi",
+  params: {sheet: "Users", cell: "E2", value: 4500}
+]
 
-Agar xabarda @SheetName!Cell yoki @SheetName!From:To formatidagi mention bo'lsa:
-1. Mention ni parse qil: sheet=SheetName, from=Cell/From, to=To (yoki from bilan bir xil)
-2. getRange(sheet, from, to) tool ni chaqirib ma'lumotni ol.
-3. Natijani \`showTable\` orqali vizual ko'rsat (afzal) yoki Markdown jadval qilib ber.
+Example 3 - Delete Row:
+User: "6-qatorni o'chir"
+❌ WRONG: "Tasdiqlaysizmi?"
+✅ RIGHT: [IMMEDIATELY CALL confirmAction tool]
 
-Misol:
-- Foydalanuvchi: "@Users!A1:C3 qiymatlarini ko'rsat"
-- Sen: 
-  1. getRange("Users", "A1", "C3") -> data ni olasan
-  2. showTable("Users", data, {from: "A1", to: "C3"}) -> vizual ko'rsatasan
+### RULE #3: WORKFLOW
 
-- Foydalanuvchi: "@Sales!E5 ni tekshir"
-- Sen: getCell("Sales", "E5") chaqir va qiymatni ko'rsat
+1. User requests modification
+2. YOU: Call confirmAction (no text asking first!)
+3. SYSTEM: Shows UI dialog with buttons
+4. USER: Clicks "Tasdiqlash" button
+5. YOU: Receive {status: "confirmed", ...}
+6. YOU: Call executeConfirmedAction
+7. YOU: Report success
 
-Mention siz ham ishlaysan - "Users sheetidagi A1:C3" desa ham getRange chaqir.
+### RULE #4: DATA OPERATIONS
 
-Excel so'rovlariga javob berganda:
-1. Avval mentionlarni parse qil (agar bo'lsa)
-2. getRange yoki getCell bilan kerakli ma'lumotni ol
-3. showTable bilan visual ko'rsatishga harakat qil
+Inspect first: Use listSheets or getSheetData to understand structure
 
-Foydalanuvchi so'roviga qarab to'g'ri tool ni tanla.`;
+Update Cell:
+- actionType: "updateExcelCell"
+- params: {sheet, cell, value}
+
+Delete Row:
+- actionType: "deleteExcelRow"
+- params: {sheet, rowIndex}
+
+Add Row:
+- actionType: "addExcelRow"
+- params: {sheet, rowData} (WITHOUT ID - server generates it!)
+- rowData: Just data fields, NO ID at start
+
+Visualize: Use showTable to show data nicely
+
+### RULE #5: COMMUNICATION
+- Clear, concise, friendly
+- Report what will happen, then call tool
+- NEVER ask for confirmation via text - TOOL DOES THAT!`;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const threadId = searchParams.get("thread_id");
-
-  if (!threadId) {
+  if (!threadId)
     return Response.json({ error: "thread_id kerak" }, { status: 400 });
-  }
 
   const messages = db
     .query("SELECT * FROM messages WHERE thread_id = ? ORDER BY id ASC")
     .all(threadId) as Array<{ id: number; role: string; content: string }>;
-  
   return Response.json(messages);
 }
 
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
-  
-  // Extract threadId from URL search params (sent by useChat as ?id=threadId)
   const { searchParams } = new URL(req.url);
   const threadId = searchParams.get("id");
-
-  if (!threadId) {
+  if (!threadId)
     return Response.json({ error: "thread_id kerak" }, { status: 400 });
-  }
 
-  // User xabarini DB ga saqlash
+  // Save user message asynchronously (non-blocking)
   const lastMessage = messages[messages.length - 1];
   if (lastMessage.role === "user") {
-    // Extract text from message parts
     const textContent = lastMessage.parts
       .filter((part) => part.type === "text")
-      .map((part) => "text" in part ? part.text : "")
+      .map((part) => ("text" in part ? part.text : ""))
       .join("");
-      
-    db.run("INSERT INTO messages (thread_id, role, content) VALUES (?, ?, ?)", [
-      threadId,
-      "user",
-      textContent,
-    ]);
+
+    // Non-blocking save
+    Promise.resolve().then(() => {
+      try {
+        db.run(
+          "INSERT INTO messages (thread_id, role, content) VALUES (?, ?, ?)",
+          [threadId, "user", textContent]
+        );
+      } catch (error) {
+        console.error("Failed to save user message:", error);
+      }
+    });
   }
 
   try {
-    // AI javobini stream qilish
     const result = streamText({
-      model: google("gemini-2.5-flash"),
+      // model: google("gemini-2.5-flash-lite"),
+      model: groq("llama-3.3-70b-versatile"), // Faster and better with tools
       system: SYSTEM_PROMPT,
       messages: convertToModelMessages(messages),
+      // @ts-expect-error - maxSteps exists but not in type definition
+      maxSteps: 10, // Allow multiple tool calls in sequence
+      temperature: 0.7,
       tools: {
-        // ============================================
-        // CONFIRMATION TOOLS
-        // ============================================
-        
-        // Confirmation tool - client-side render qilinadi
         confirmAction: tool({
-          description: `Request user confirmation before performing a dangerous action. 
-            Use this for delete, update, or clear operations, AND FOR EXCEL UPDATES.
-            The user will see a confirmation dialog.`,
+          description: `IMMEDIATE ACTION REQUIRED: Call this tool when user wants to modify data.
+          
+          DO NOT ASK USER VIA TEXT! Call this tool immediately!
+          
+          Bad: "Alexsandr uchun qanday ID berasiz?" ❌
+          Bad: "Tasdiqlaysizmi?" ❌
+          Good: [Call this tool immediately] ✅
+          
+          This tool shows a visual dialog with "Tasdiqlash" and "Bekor qilish" buttons.
+          User clicks the button, then you get the result and call executeConfirmedAction.
+          
+          Parameters:
+          - actionType: "updateExcelCell" | "deleteExcelRow" | "addExcelRow"
+          - actionTitle: Brief title (e.g., "Yangi foydalanuvchi", "Maoshni yangilash")
+          - actionDescription: What will change (e.g., "Alexsandr qo'shiladi")
+          - params: {sheet, cell?, value?, rowIndex?, rowData?}
+          
+          For addExcelRow: rowData should NOT include ID - server generates it automatically!`,
           inputSchema: confirmActionSchema,
-          // No execute - this will be handled client-side
         }),
-
-        // Execute tool - server-side bajariladi
         executeConfirmedAction: tool({
-          description: `Execute a previously confirmed action. Only call after user confirmed.`,
+          description: `Execute an action after user confirmation.
+          
+          CRITICAL: Call this IMMEDIATELY after confirmAction returns {status: "confirmed"}.
+          User already confirmed via button click - no additional confirmation needed.
+          
+          Parameters:
+          - actionType: Same as in confirmAction
+          - params: Same params from confirmAction
+          
+          Returns: {success: boolean, message: string}`,
           inputSchema: executeConfirmedActionSchema,
           execute: async ({ actionType, params }) => {
-            console.log("🚀 Executing action:", actionType);
-            const result = await executeConfirmedAction(actionType, params);
-            return result;
+            console.log("Executing action:", actionType, params);
+            return await executeConfirmedAction(actionType, params);
           },
         }),
-
-        // ============================================
-        // UI TOOLS
-        // ============================================
         showTable: tool({
-          description: "Show data in a visual table modal to the user. Use this when user asks to see data or mentions a range.",
+          description:
+            "Display data in a visual table grid modal. Use this instead of listing raw arrays. Better UX for viewing Excel data.",
           inputSchema: showTableSchema,
         }),
-
-        // ============================================
-        // EXCEL READ TOOLS
-        // ============================================
         ...excelReadTools,
       },
       async onFinish({ text }) {
-        // AI javobini DB ga saqlash (agar matn bo'lsa)
+        // Save assistant message asynchronously (non-blocking)
         if (text && text.trim()) {
-          console.log("🤖 AI finished:", text.substring(0, 50) + "...");
-          db.run("INSERT INTO messages (thread_id, role, content) VALUES (?, ?, ?)", [
-            threadId,
-            "assistant",
-            text,
-          ]);
+          Promise.resolve().then(() => {
+            try {
+              db.run(
+                "INSERT INTO messages (thread_id, role, content) VALUES (?, ?, ?)",
+                [threadId, "assistant", text]
+              );
+            } catch (error) {
+              console.error("Failed to save assistant message:", error);
+            }
+          });
         }
       },
       onError: (error) => {
-        console.error("❌ AI Stream Error:", error);
+        console.error("AI Error:", error);
       },
     });
 
-    // Return stream response compatible with @ai-sdk/react v2
     return result.toUIMessageStreamResponse();
   } catch (error) {
-    console.error("❌ General API Error:", error);
+    console.error("API Error:", error);
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

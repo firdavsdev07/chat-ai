@@ -24,6 +24,10 @@ export interface ThreadsProps {
   activeId: number | null;
   onNew: () => void;
   onSelect: (id: number) => void;
+  onHome: () => void;
+  onRename: (id: number, newTitle: string) => void; // Yangi
+  onDelete: (id: number) => void; // Yangi
+  isLoading?: boolean;
 }
 
 export interface ChatProps {

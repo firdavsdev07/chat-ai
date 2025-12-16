@@ -1,17 +1,33 @@
 import { z } from "zod";
 
-export type ActionType = "deleteThread" | "updateThreadTitle" | "clearMessages" | "updateExcelCell";
+export type ActionType = "deleteThread" | "updateThreadTitle" | "clearMessages" | "updateExcelCell" | "deleteExcelRow" | "addExcelRow";
 
 export interface ConfirmActionParams {
   actionType: ActionType;
   actionTitle: string;
   actionDescription: string;
-  params: { threadId?: number; newTitle?: string; sheet?: string; cell?: string; value?: string | number | boolean };
+  params: { 
+    threadId?: number; 
+    newTitle?: string; 
+    sheet?: string; 
+    cell?: string; 
+    value?: string | number | boolean;
+    rowIndex?: number;
+    rowData?: (string | number | boolean | null)[];
+  };
 }
 
 export interface ExecuteActionParams {
   actionType: ActionType;
-  params: { threadId?: number; newTitle?: string; sheet?: string; cell?: string; value?: string | number | boolean };
+  params: { 
+    threadId?: number; 
+    newTitle?: string; 
+    sheet?: string; 
+    cell?: string; 
+    value?: string | number | boolean;
+    rowIndex?: number;
+    rowData?: (string | number | boolean | null)[];
+  };
 }
 
 const paramsSchema = z.object({
@@ -20,17 +36,19 @@ const paramsSchema = z.object({
   sheet: z.string().optional(),
   cell: z.string().optional(),
   value: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  rowIndex: z.number().optional().describe("Row index (1-based)"),
+  rowData: z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional().describe("Data for new row"),
 });
 
 export const confirmActionSchema = z.object({
-  actionType: z.enum(["deleteThread", "updateThreadTitle", "clearMessages", "updateExcelCell"]).describe("Action type"),
+  actionType: z.enum(["deleteThread", "updateThreadTitle", "clearMessages", "updateExcelCell", "deleteExcelRow", "addExcelRow"]).describe("Action type"),
   actionTitle: z.string().describe("Dialog title"),
   actionDescription: z.string().describe("Description"),
   params: paramsSchema,
 });
 
 export const executeConfirmedActionSchema = z.object({
-  actionType: z.enum(["deleteThread", "updateThreadTitle", "clearMessages", "updateExcelCell"]),
+  actionType: z.enum(["deleteThread", "updateThreadTitle", "clearMessages", "updateExcelCell", "deleteExcelRow", "addExcelRow"]),
   params: paramsSchema,
 });
 

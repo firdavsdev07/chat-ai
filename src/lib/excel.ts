@@ -1,17 +1,28 @@
-/**
- * Excel utility functions for reading xlsx files
- * Uses SheetJS (xlsx) library
- */
 import * as XLSX from "xlsx";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 
-// Excel file path (hardcoded)
 const EXCEL_FILE_PATH = join(process.cwd(), "data", "example.xlsx");
 
-// ============================================
-// TYPE DEFINITIONS
-// ============================================
+// Simple in-memory cache for read operations
+let cachedWorkbook: XLSX.WorkBook | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 5000; // 5 seconds cache
+
+function getCachedWorkbook(): XLSX.WorkBook {
+  const now = Date.now();
+  if (cachedWorkbook && (now - cacheTimestamp) < CACHE_TTL) {
+    return cachedWorkbook;
+  }
+  cachedWorkbook = loadWorkbook();
+  cacheTimestamp = now;
+  return cachedWorkbook;
+}
+
+function invalidateCache() {
+  cachedWorkbook = null;
+  cacheTimestamp = 0;
+}
 
 export interface CellValue {
   value: string | number | boolean | null;
@@ -42,33 +53,19 @@ export interface SheetInfo {
   usedRange: string;
 }
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-/**
- * Load workbook from file
- */
 function loadWorkbook(): XLSX.WorkBook {
   if (!existsSync(EXCEL_FILE_PATH)) {
     throw new Error(`Excel file not found: ${EXCEL_FILE_PATH}`);
   }
-  
   const buffer = readFileSync(EXCEL_FILE_PATH);
   return XLSX.read(buffer, { type: "buffer", cellFormula: true });
 }
 
-/**
- * Save workbook to file
- */
 function saveWorkbook(wb: XLSX.WorkBook): void {
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   writeFileSync(EXCEL_FILE_PATH, buffer);
 }
 
-/**
- * Convert column letter to index (A=0, B=1, etc.)
- */
 function colToIndex(col: string): number {
   let result = 0;
   for (let i = 0; i < col.length; i++) {
@@ -77,9 +74,6 @@ function colToIndex(col: string): number {
   return result - 1;
 }
 
-/**
- * Convert index to column letter (0=A, 1=B, etc.)
- */
 function indexToCol(index: number): string {
   let result = "";
   index++;
@@ -91,77 +85,35 @@ function indexToCol(index: number): string {
   return result;
 }
 
-/**
- * Parse cell reference (e.g., "A1" -> { col: 0, row: 0 })
- */
 function parseCellRef(ref: string): { col: number; row: number } {
   const match = ref.match(/^([A-Z]+)(\d+)$/i);
-  if (!match) {
-    throw new Error(`Invalid cell reference: ${ref}`);
-  }
-  return {
-    col: colToIndex(match[1].toUpperCase()),
-    row: parseInt(match[2], 10) - 1,
-  };
+  if (!match) throw new Error(`Invalid cell reference: ${ref}`);
+  return { col: colToIndex(match[1].toUpperCase()), row: parseInt(match[2], 10) - 1 };
 }
 
-/**
- * Get cell value and type
- */
 function getCellData(cell: XLSX.CellObject | undefined): CellValue {
-  if (!cell) {
-    return { value: null, type: "empty" };
-  }
+  if (!cell) return { value: null, type: "empty" };
 
   let type: CellValue["type"] = "string";
   let value: string | number | boolean | null = null;
 
   switch (cell.t) {
-    case "n":
-      type = "number";
-      value = cell.v as number;
-      break;
-    case "s":
-      type = "string";
-      value = cell.v as string;
-      break;
-    case "b":
-      type = "boolean";
-      value = cell.v as boolean;
-      break;
-    case "d":
-      type = "date";
-      value = cell.w || String(cell.v);
-      break;
-    case "e":
-      type = "error";
-      value = cell.w || "#ERROR";
-      break;
-    default:
-      value = cell.v !== undefined ? String(cell.v) : null;
+    case "n": type = "number"; value = cell.v as number; break;
+    case "s": type = "string"; value = cell.v as string; break;
+    case "b": type = "boolean"; value = cell.v as boolean; break;
+    case "d": type = "date"; value = cell.w || String(cell.v); break;
+    case "e": type = "error"; value = cell.w || "#ERROR"; break;
+    default: value = cell.v !== undefined ? String(cell.v) : null;
   }
 
-  return {
-    value,
-    type,
-    formula: cell.f,
-  };
+  return { value, type, formula: cell.f };
 }
 
-// ============================================
-// MAIN EXCEL FUNCTIONS
-// ============================================
-
-/**
- * List all sheets in the workbook
- */
 export function listSheets(): SheetInfo[] {
-  const wb = loadWorkbook();
-  
+  const wb = getCachedWorkbook();
   return wb.SheetNames.map((name) => {
     const ws = wb.Sheets[name];
     const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
-    
     return {
       name,
       rowCount: range.e.r - range.s.r + 1,
@@ -171,76 +123,40 @@ export function listSheets(): SheetInfo[] {
   });
 }
 
-/**
- * Get value of a single cell
- */
 export function getCell(sheet: string, cell: string): CellResult {
-  const wb = loadWorkbook();
+  const wb = getCachedWorkbook();
   const ws = wb.Sheets[sheet];
-  
-  if (!ws) {
-    throw new Error(`Sheet not found: ${sheet}. Available sheets: ${wb.SheetNames.join(", ")}`);
-  }
+  if (!ws) throw new Error(`Sheet not found: ${sheet}. Available: ${wb.SheetNames.join(", ")}`);
   
   const cellRef = cell.toUpperCase();
   const cellData = getCellData(ws[cellRef]);
-  
-  return {
-    sheet,
-    cell: cellRef,
-    value: cellData.value,
-    formula: cellData.formula,
-    type: cellData.type,
-  };
+  return { sheet, cell: cellRef, value: cellData.value, formula: cellData.formula, type: cellData.type };
 }
 
-/**
- * Get formula from a cell (if exists)
- */
 export function getCellFormula(sheet: string, cell: string): { sheet: string; cell: string; formula: string | null; hasFormula: boolean } {
-  const wb = loadWorkbook();
+  const wb = getCachedWorkbook();
   const ws = wb.Sheets[sheet];
-  
-  if (!ws) {
-    throw new Error(`Sheet not found: ${sheet}. Available sheets: ${wb.SheetNames.join(", ")}`);
-  }
+  if (!ws) throw new Error(`Sheet not found: ${sheet}. Available: ${wb.SheetNames.join(", ")}`);
   
   const cellRef = cell.toUpperCase();
   const cellObj = ws[cellRef];
-  
-  return {
-    sheet,
-    cell: cellRef,
-    formula: cellObj?.f || null,
-    hasFormula: !!cellObj?.f,
-  };
+  return { sheet, cell: cellRef, formula: cellObj?.f || null, hasFormula: !!cellObj?.f };
 }
 
-/**
- * Get range of cells
- * @param sheet - Sheet name
- * @param from - Start cell (e.g., "A1")
- * @param to - End cell (e.g., "C5")
- */
 export function getRange(sheet: string, from: string, to: string): RangeResult {
-  const wb = loadWorkbook();
+  const wb = getCachedWorkbook();
   const ws = wb.Sheets[sheet];
-  
-  if (!ws) {
-    throw new Error(`Sheet not found: ${sheet}. Available sheets: ${wb.SheetNames.join(", ")}`);
-  }
+  if (!ws) throw new Error(`Sheet not found: ${sheet}. Available: ${wb.SheetNames.join(", ")}`);
   
   const startRef = parseCellRef(from.toUpperCase());
   const endRef = parseCellRef(to.toUpperCase());
   
-  // Ensure start is before end
   const minCol = Math.min(startRef.col, endRef.col);
   const maxCol = Math.max(startRef.col, endRef.col);
   const minRow = Math.min(startRef.row, endRef.row);
   const maxRow = Math.max(startRef.row, endRef.row);
   
   const data: (string | number | boolean | null)[][] = [];
-  
   for (let row = minRow; row <= maxRow; row++) {
     const rowData: (string | number | boolean | null)[] = [];
     for (let col = minCol; col <= maxCol; col++) {
@@ -251,86 +167,99 @@ export function getRange(sheet: string, from: string, to: string): RangeResult {
     data.push(rowData);
   }
   
-  const rangeStr = `${from.toUpperCase()}:${to.toUpperCase()}`;
-  
   return {
     sheet,
-    range: rangeStr,
+    range: `${from.toUpperCase()}:${to.toUpperCase()}`,
     data,
     rowCount: maxRow - minRow + 1,
     colCount: maxCol - minCol + 1,
   };
 }
 
-/**
- * Get entire sheet as 2D array
- */
 export function getSheetData(sheet: string): RangeResult {
-  const wb = loadWorkbook();
+  const wb = getCachedWorkbook();
   const ws = wb.Sheets[sheet];
-  
-  if (!ws) {
-    throw new Error(`Sheet not found: ${sheet}. Available sheets: ${wb.SheetNames.join(", ")}`);
-  }
+  if (!ws) throw new Error(`Sheet not found: ${sheet}. Available: ${wb.SheetNames.join(", ")}`);
   
   const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
   const startCell = indexToCol(range.s.c) + (range.s.r + 1);
   const endCell = indexToCol(range.e.c) + (range.e.r + 1);
-  
   return getRange(sheet, startCell, endCell);
 }
 
-// ============================================
-// WRITE FUNCTIONS
-// ============================================
+export function deleteRow(sheet: string, rowIndex: number): void {
+  const wb = loadWorkbook(); // Always reload for write operations
+  const ws = wb.Sheets[sheet];
+  if (!ws) throw new Error(`Sheet not found: ${sheet}`);
 
-/**
- * Update a single cell
- */
+  // Convert to 2D array
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+  if (rowIndex < 0 || rowIndex >= data.length) {
+    throw new Error(`Row index ${rowIndex + 1} out of bounds (Total: ${data.length})`);
+  }
+
+  // Remove row
+  data.splice(rowIndex, 1);
+
+  // Re-create sheet
+  const newWs = XLSX.utils.aoa_to_sheet(data);
+  wb.Sheets[sheet] = newWs;
+  saveWorkbook(wb);
+  invalidateCache(); // Invalidate cache after write
+}
+
+export function addRow(sheet: string, rowIndex: number, rowData: any[]): void {
+  const wb = loadWorkbook(); // Always reload for write operations
+  const ws = wb.Sheets[sheet];
+  if (!ws) throw new Error(`Sheet not found: ${sheet}`);
+
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+  // Agar rowIndex judayam katta bo'lsa, oxiriga qo'shish
+  if (rowIndex > data.length) rowIndex = data.length;
+
+  data.splice(rowIndex, 0, rowData);
+
+  const newWs = XLSX.utils.aoa_to_sheet(data);
+  wb.Sheets[sheet] = newWs;
+  saveWorkbook(wb);
+  invalidateCache(); // Invalidate cache after write
+}
+
 export function updateCell(sheet: string, cell: string, value: string | number | boolean | null): CellResult {
   const wb = loadWorkbook();
   const ws = wb.Sheets[sheet];
-  
-  if (!ws) {
-    throw new Error(`Sheet not found: ${sheet}. Available sheets: ${wb.SheetNames.join(", ")}`);
-  }
+  if (!ws) throw new Error(`Sheet not found: ${sheet}. Available: ${wb.SheetNames.join(", ")}`);
   
   const cellRef = cell.toUpperCase();
+  const cellAddress = XLSX.utils.decode_cell(cellRef);
+
+  // Xavfsizlik: Juda uzoq kataklarga yozishni oldini olish
+  if (cellAddress.r > 20000) throw new Error("Row limit exceeded (max 20000)");
+  if (cellAddress.c > 1000) throw new Error("Column limit exceeded (max 1000)");
   
-  // Check if value is a formula (starts with =)
   if (typeof value === 'string' && value.startsWith('=')) {
     ws[cellRef] = { f: value.substring(1) };
   } else {
-    // Create new cell object based on type
     let cellObj: XLSX.CellObject;
-    if (value === null) {
-        // Need to verify if this effectively deletes/clears the cell
-        // In SheetJS one way to clear is to set type to 'z' (stub) or just delete property?
-        // But simply assigning a value usually works if we follow util
-        // For simplicity:
-        cellObj = { t: 's', v: '' }; // Clear content
-    } else if (typeof value === 'number') {
-        cellObj = { t: 'n', v: value };
-    } else if (typeof value === 'boolean') {
-        cellObj = { t: 'b', v: value };
-    } else {
-        cellObj = { t: 's', v: String(value) };
-    }
+    if (value === null) cellObj = { t: 's', v: '' }; // Clear cell
+    else if (typeof value === 'number') cellObj = { t: 'n', v: value };
+    else if (typeof value === 'boolean') cellObj = { t: 'b', v: value };
+    else cellObj = { t: 's', v: String(value) };
     ws[cellRef] = cellObj;
   }
   
-  // Recalculate range if needed (simplified: just ensure range covers this cell)
   const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
-  const cellAddress = XLSX.utils.decode_cell(cellRef);
   
+  // Range ni kengaytirish
   if (range.s.r > cellAddress.r) range.s.r = cellAddress.r;
   if (range.s.c > cellAddress.c) range.s.c = cellAddress.c;
   if (range.e.r < cellAddress.r) range.e.r = cellAddress.r;
   if (range.e.c < cellAddress.c) range.e.c = cellAddress.c;
   
   ws["!ref"] = XLSX.utils.encode_range(range);
-  
   saveWorkbook(wb);
-  
+  invalidateCache(); // Invalidate cache after write
   return getCell(sheet, cell);
 }
