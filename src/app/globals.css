@@ -3,15 +3,11 @@
 :root {
   --background: #ffffff;
   --foreground: #0f172a;
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --secondary: #64748b;
-  --accent: #10b981;
+  --primary: #2563eb;
   --border: #e2e8f0;
-  --muted: #f8fafc;
+  --muted: #f1f5f9;
 }
 
-/* Typography */
 body {
   background: var(--background);
   color: var(--foreground);
@@ -22,7 +18,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar styling */
+/* Custom Scrollbar for Light Theme */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -41,9 +37,8 @@ body {
   background: #94a3b8;
 }
 
-/* Custom scrollbar for threads sidebar */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
@@ -55,24 +50,11 @@ body {
   background: #cbd5e1;
 }
 
-/* Selection */
 ::selection {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(37, 99, 235, 0.15);
   color: inherit;
 }
 
-/* Focus outline improvements */
-:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-/* Button reset */
-button {
-  font-family: inherit;
-}
-
-/* Smooth transitions for all interactive elements */
 button, a, input, textarea {
   transition: all 0.15s ease;
 }

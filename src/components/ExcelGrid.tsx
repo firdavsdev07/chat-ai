@@ -12,9 +12,7 @@ interface ExcelGridProps {
 export default function ExcelGrid({ data, onSelectionChange, maxHeight = "400px" }: ExcelGridProps) {
   const { selection, isSelecting, getSelectionResult, handleMouseDown, handleMouseMove, handleMouseUp, isCellSelected, isCellSelectionStart, isCellSelectionEnd } = useRangeSelection();
 
-  useEffect(() => {
-    onSelectionChange?.(getSelectionResult());
-  }, [selection, getSelectionResult, onSelectionChange]);
+  useEffect(() => { onSelectionChange?.(getSelectionResult()); }, [selection, getSelectionResult, onSelectionChange]);
 
   useEffect(() => {
     const onMouseUp = () => isSelecting && handleMouseUp();
@@ -40,21 +38,18 @@ export default function ExcelGrid({ data, onSelectionChange, maxHeight = "400px"
   }, [selection, isCellSelected, isCellSelectionStart, isCellSelectionEnd]);
 
   const formatValue = (v: string | number | boolean | null) => v === null ? "" : typeof v === "boolean" ? (v ? "TRUE" : "FALSE") : String(v);
-
   const colCount = data.length > 0 ? Math.max(...data.map(r => r.length)) : 0;
 
-  if (!data.length) {
-    return <div className="flex items-center justify-center h-40 text-slate-400">Ma&apos;lumot topilmadi</div>;
-  }
+  if (!data.length) return <div className="flex items-center justify-center h-40 text-slate-500">Ma&apos;lumot topilmadi</div>;
 
   return (
-    <div className="overflow-auto border border-slate-300 rounded-lg bg-white shadow-sm" style={{ maxHeight }}>
+    <div className="overflow-auto border border-slate-200 rounded-lg bg-white shadow-sm custom-scrollbar" style={{ maxHeight }}>
       <table className="w-full border-collapse select-none text-[13px]">
         <thead className="sticky top-0 z-10">
           <tr>
-            <th className="sticky left-0 z-20 min-w-[44px] h-8 bg-slate-600 border border-slate-700 border-t-0 border-l-0" />
+            <th className="sticky left-0 z-20 min-w-[44px] h-8 bg-slate-100 border border-slate-200 border-t-0 border-l-0" />
             {Array.from({ length: colCount }, (_, i) => (
-              <th key={i} className="min-w-[90px] h-8 px-2.5 bg-slate-600 border border-slate-700 border-t-0 text-white text-xs font-semibold text-center">
+              <th key={i} className="min-w-[90px] h-8 px-2.5 bg-slate-50 border border-slate-200 border-t-0 text-slate-500 text-xs font-semibold text-center uppercase tracking-wider">
                 {indexToCol(i)}
               </th>
             ))}
@@ -63,7 +58,7 @@ export default function ExcelGrid({ data, onSelectionChange, maxHeight = "400px"
         <tbody>
           {data.map((row, ri) => (
             <tr key={ri}>
-              <td className="sticky left-0 z-5 min-w-[44px] px-2.5 py-1.5 bg-slate-100 border border-slate-300 text-slate-600 text-xs font-semibold text-center">
+              <td className="sticky left-0 z-5 min-w-[44px] px-2.5 py-1.5 bg-slate-50 border border-slate-200 text-slate-500 text-xs font-semibold text-center border-r-slate-200">
                 {ri + 1}
               </td>
               {Array.from({ length: colCount }, (_, ci) => (
@@ -84,21 +79,22 @@ export default function ExcelGrid({ data, onSelectionChange, maxHeight = "400px"
 
       <style jsx>{`
         .excel-cell {
-          min-width: 90px; height: 28px; padding: 4px 8px;
+          min-width: 90px; height: 32px; padding: 4px 8px;
           background: white; border: 1px solid #e2e8f0;
-          cursor: cell; color: #1e293b;
+          cursor: cell; color: #334155; transition: background 0.05s;
         }
         .excel-cell:hover:not(.excel-cell-selected) { background: #f8fafc; }
-        .excel-cell-selected { background: rgba(59, 130, 246, 0.12) !important; }
-        .excel-cell-selected.excel-cell-top { border-top: 2px solid #3b82f6; }
-        .excel-cell-selected.excel-cell-bottom { border-bottom: 2px solid #3b82f6; }
-        .excel-cell-selected.excel-cell-left { border-left: 2px solid #3b82f6; }
-        .excel-cell-selected.excel-cell-right { border-right: 2px solid #3b82f6; }
-        .excel-cell-start { background: rgba(59, 130, 246, 0.2) !important; }
+        .excel-cell-selected { background: rgba(37, 99, 235, 0.1) !important; }
+        .excel-cell-selected.excel-cell-top { border-top: 2px solid #2563eb; }
+        .excel-cell-selected.excel-cell-bottom { border-bottom: 2px solid #2563eb; }
+        .excel-cell-selected.excel-cell-left { border-left: 2px solid #2563eb; }
+        .excel-cell-selected.excel-cell-right { border-right: 2px solid #2563eb; }
+        .excel-cell-start { background: rgba(37, 99, 235, 0.2) !important; }
         .excel-cell-end { position: relative; }
         .excel-cell-end::after {
-          content: ''; position: absolute; right: -3px; bottom: -3px;
-          width: 6px; height: 6px; background: #3b82f6; border: 1px solid white;
+          content: ''; position: absolute; right: -4px; bottom: -4px;
+          width: 8px; height: 8px; background: #2563eb; border: 2px solid white;
+          z-index: 10; border-radius: 2px;
         }
       `}</style>
     </div>

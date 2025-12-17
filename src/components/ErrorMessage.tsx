@@ -1,50 +1,28 @@
-"use client";
+import { AlertTriangle, RefreshCcw, X } from "lucide-react";
 
-import { AlertTriangle, RotateCcw, X } from "lucide-react";
-
-interface ErrorMessageProps {
-  title?: string;
-  message: string;
-  onRetry?: () => void;
-  onDismiss?: () => void;
-  showRetry?: boolean;
-}
-
-export default function ErrorMessage({
-  title = "Xatolik yuz berdi",
-  message,
-  onRetry,
-  onDismiss,
-  showRetry = true,
-}: ErrorMessageProps) {
+export default function ErrorMessage({ title = "Xatolik yuz berdi", message, onRetry, onDismiss, showRetry = true }: any) {
   return (
-    <div className="flex justify-start">
-      <div className="max-w-md bg-red-50 border border-red-200 rounded-2xl p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-            <AlertTriangle className="w-4 h-4 text-red-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-semibold text-red-800">{title}</h4>
-            <p className="mt-1 text-sm text-red-600">{message}</p>
-          </div>
-          {onDismiss && (
-            <button onClick={onDismiss} className="flex-shrink-0 p-1 text-red-400 hover:text-red-600 transition-colors">
-              <X className="w-4 h-4" />
-            </button>
-          )}
+    <div className="max-w-xl bg-red-50 border border-red-200 rounded-xl p-4 shadow-md animate-in fade-in slide-in-from-bottom-3 duration-300">
+      <div className="flex gap-3">
+        <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0 text-red-600 border border-red-200">
+          <AlertTriangle className="w-5 h-5" />
         </div>
-        {showRetry && onRetry && (
-          <div className="mt-3">
-            <button
-              onClick={onRetry}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Qayta urinish
-            </button>
+        <div className="flex-1">
+          <h4 className="text-sm font-bold text-red-900">{title}</h4>
+          <p className="text-sm text-red-700 mt-1.5 leading-relaxed">{message}</p>
+          <div className="flex gap-2 mt-4">
+            {showRetry && onRetry && (
+              <button onClick={onRetry} className="text-xs flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium shadow-sm">
+                <RefreshCcw className="w-3.5 h-3.5" /> Qayta urinish
+              </button>
+            )}
+            {onDismiss && (
+              <button onClick={onDismiss} className="text-xs flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-red-50 text-red-600 rounded-lg transition-colors font-medium border border-red-200">
+                <X className="w-3.5 h-3.5" /> Yopish
+              </button>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
