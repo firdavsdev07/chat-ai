@@ -12,85 +12,15 @@ import {
 
 export const maxDuration = 30;
 
-const SYSTEM_PROMPT = `You are a professional AI assistant. You communicate fluently in Uzbek and Russian.
-Your primary function is working with Excel files and analyzing data.
+const SYSTEM_PROMPT = `You are an AI assistant that works with Excel files. Communicate in Uzbek/Russian.
 
-## CRITICAL BEHAVIOR RULES
+KEY RULES:
+1. When user wants to modify data (add/update/delete) → CALL confirmAction tool immediately
+2. DON'T ask for confirmation via text - the tool shows a UI dialog
+3. After user confirms → call executeConfirmedAction
+4. Use listSheets/getRange to read data, showTable to display nicely
 
-### RULE #1: WHEN USER WANTS TO MODIFY DATA - CALL TOOL IMMEDIATELY!
-
-YOU MUST NOT:
-- Ask "Alexsandr uchun qanday ID raqamini berasiz?" (WRONG!)
-- Ask "Tasdiqlaysizmi?" or "Ma'qulmi?" (WRONG!)
-- Say "Iltimos, tasdiqlash uchun confirmAction funksiyasini chaqiring" (WRONG!)
-- Ask for any additional information if you have enough data
-
-YOU MUST:
-- When user says "add/update/delete" → IMMEDIATELY CALL THE TOOL
-- If sheet has ID column → DON'T ask for ID, server generates it automatically
-- Call confirmAction first, then wait for user button click
-
-### RULE #2: CONCRETE EXAMPLES
-
-Example 1 - Add Row:
-User: "Yangi user qo'shamiz: Alexsandr, alex@gmail.com, Developer, 4760"
-❌ WRONG: "Alexsandr uchun qanday ID raqamini berasiz?"
-✅ RIGHT: [IMMEDIATELY CALL confirmAction tool with:
-  actionType: "addExcelRow",
-  actionTitle: "Yangi foydalanuvchi",
-  actionDescription: "Alexsandr (alex@gmail.com, Developer, 4760) qo'shiladi",
-  params: {sheet: "Users", rowData: ["Alexsandr", "alex@gmail.com", "Developer", 4760]}
-]
-Server will auto-generate ID!
-
-Example 2 - Update Cell:
-User: "Firdavsning maoshini 4500 qil"
-❌ WRONG: "Ma'qulmi?"
-✅ RIGHT: [IMMEDIATELY CALL confirmAction tool with:
-  actionType: "updateExcelCell",
-  actionTitle: "Maoshni yangilash",
-  actionDescription: "Firdavs maoshi 4500 ga o'zgaradi",
-  params: {sheet: "Users", cell: "E2", value: 4500}
-]
-
-Example 3 - Delete Row:
-User: "6-qatorni o'chir"
-❌ WRONG: "Tasdiqlaysizmi?"
-✅ RIGHT: [IMMEDIATELY CALL confirmAction tool]
-
-### RULE #3: WORKFLOW
-
-1. User requests modification
-2. YOU: Call confirmAction (no text asking first!)
-3. SYSTEM: Shows UI dialog with buttons
-4. USER: Clicks "Tasdiqlash" button
-5. YOU: Receive {status: "confirmed", ...}
-6. YOU: Call executeConfirmedAction
-7. YOU: Report success
-
-### RULE #4: DATA OPERATIONS
-
-Inspect first: Use listSheets or getSheetData to understand structure
-
-Update Cell:
-- actionType: "updateExcelCell"
-- params: {sheet, cell, value}
-
-Delete Row:
-- actionType: "deleteExcelRow"
-- params: {sheet, rowIndex}
-
-Add Row:
-- actionType: "addExcelRow"
-- params: {sheet, rowData} (WITHOUT ID - server generates it!)
-- rowData: Just data fields, NO ID at start
-
-Visualize: Use showTable to show data nicely
-
-### RULE #5: COMMUNICATION
-- Clear, concise, friendly
-- Report what will happen, then call tool
-- NEVER ask for confirmation via text - TOOL DOES THAT!`;
+For adding rows: rowData should NOT include ID (server auto-generates it)`;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -100,8 +30,24 @@ export async function GET(req: Request) {
 
   const messages = db
     .query("SELECT * FROM messages WHERE thread_id = ? ORDER BY id ASC")
-    .all(threadId) as Array<{ id: number; role: string; content: string }>;
-  return Response.json(messages);
+    .all(threadId) as Array<{
+    id: number;
+    role: string;
+    content: string;
+    tool_invocations: string | null;
+  }>;
+
+  // Parse tool_invocations from JSON string
+  const parsedMessages = messages.map((msg) => ({
+    id: msg.id,
+    role: msg.role,
+    content: msg.content,
+    toolInvocations: msg.tool_invocations
+      ? JSON.parse(msg.tool_invocations)
+      : undefined,
+  }));
+
+  return Response.json(parsedMessages);
 }
 
 export async function POST(req: Request) {
@@ -134,46 +80,20 @@ export async function POST(req: Request) {
 
   try {
     const result = streamText({
-      // model: google("gemini-2.5-flash-lite"),
-      model: groq("llama-3.3-70b-versatile"), // Faster and better with tools
+      // model: google("gemini-2.0-flash-exp"),
+      model: groq("llama-3.3-70b-versatile"),
       system: SYSTEM_PROMPT,
       messages: convertToModelMessages(messages),
       // @ts-expect-error - maxSteps exists but not in type definition
-      maxSteps: 10, // Allow multiple tool calls in sequence
-      temperature: 0.7,
+      maxSteps: 3, // Reduced for Groq stability
+      temperature: 0.3, // Lower temp for more predictable tool calling
       tools: {
         confirmAction: tool({
-          description: `IMMEDIATE ACTION REQUIRED: Call this tool when user wants to modify data.
-          
-          DO NOT ASK USER VIA TEXT! Call this tool immediately!
-          
-          Bad: "Alexsandr uchun qanday ID berasiz?" ❌
-          Bad: "Tasdiqlaysizmi?" ❌
-          Good: [Call this tool immediately] ✅
-          
-          This tool shows a visual dialog with "Tasdiqlash" and "Bekor qilish" buttons.
-          User clicks the button, then you get the result and call executeConfirmedAction.
-          
-          Parameters:
-          - actionType: "updateExcelCell" | "deleteExcelRow" | "addExcelRow"
-          - actionTitle: Brief title (e.g., "Yangi foydalanuvchi", "Maoshni yangilash")
-          - actionDescription: What will change (e.g., "Alexsandr qo'shiladi")
-          - params: {sheet, cell?, value?, rowIndex?, rowData?}
-          
-          For addExcelRow: rowData should NOT include ID - server generates it automatically!`,
+          description: `Request user confirmation before modifying data. Shows UI dialog with buttons. Don't ask via text - call this tool directly.`,
           inputSchema: confirmActionSchema,
         }),
         executeConfirmedAction: tool({
-          description: `Execute an action after user confirmation.
-          
-          CRITICAL: Call this IMMEDIATELY after confirmAction returns {status: "confirmed"}.
-          User already confirmed via button click - no additional confirmation needed.
-          
-          Parameters:
-          - actionType: Same as in confirmAction
-          - params: Same params from confirmAction
-          
-          Returns: {success: boolean, message: string}`,
+          description: `Execute action after user clicks confirm button. Call immediately after confirmAction returns confirmed status.`,
           inputSchema: executeConfirmedActionSchema,
           execute: async ({ actionType, params }) => {
             console.log("Executing action:", actionType, params);
@@ -181,20 +101,59 @@ export async function POST(req: Request) {
           },
         }),
         showTable: tool({
-          description:
-            "Display data in a visual table grid modal. Use this instead of listing raw arrays. Better UX for viewing Excel data.",
+          description: "Display Excel data in a visual table modal.",
           inputSchema: showTableSchema,
         }),
         ...excelReadTools,
       },
-      async onFinish({ text }) {
+      async onFinish({ text, toolCalls, toolResults, response }) {
         // Save assistant message asynchronously (non-blocking)
         if (text && text.trim()) {
           Promise.resolve().then(() => {
             try {
+              // Collect tool invocations from response
+              const toolInvocations: any[] = [];
+
+              // Add tool calls
+              if (toolCalls && toolCalls.length > 0) {
+                for (const call of toolCalls) {
+                  toolInvocations.push({
+                    toolCallId: call.toolCallId,
+                    toolName: call.toolName,
+                    args: (call as any).args,
+                    state: "call",
+                  });
+                }
+              }
+
+              // Add tool results
+              if (toolResults && toolResults.length > 0) {
+                for (const result of toolResults) {
+                  const existing = toolInvocations.find(
+                    (t) => t.toolCallId === result.toolCallId
+                  );
+                  if (existing) {
+                    existing.state = "result";
+                    existing.result = (result as any).result;
+                  } else {
+                    toolInvocations.push({
+                      toolCallId: result.toolCallId,
+                      toolName: result.toolName,
+                      result: (result as any).result,
+                      state: "result",
+                    });
+                  }
+                }
+              }
+
+              const toolInvocationsJson =
+                toolInvocations.length > 0
+                  ? JSON.stringify(toolInvocations)
+                  : null;
+
               db.run(
-                "INSERT INTO messages (thread_id, role, content) VALUES (?, ?, ?)",
-                [threadId, "assistant", text]
+                "INSERT INTO messages (thread_id, role, content, tool_invocations) VALUES (?, ?, ?, ?)",
+                [threadId, "assistant", text, toolInvocationsJson]
               );
             } catch (error) {
               console.error("Failed to save assistant message:", error);

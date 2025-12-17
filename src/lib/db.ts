@@ -26,6 +26,7 @@ db.run(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     thread_id INTEGER NOT NULL,
     role TEXT NOT NULL,
-    content TEXT NOT NULL
+    content TEXT NOT NULL,
+    tool_invocations TEXT
   )
 `);

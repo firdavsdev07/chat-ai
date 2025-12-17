@@ -102,19 +102,23 @@ export default function Threads({ threads, activeId, onNew, onSelect, onHome, on
 
       <div className="w-72 bg-slate-50 border-r border-slate-200 flex flex-col h-full font-sans">
         <div className="p-5 border-b border-slate-200/50 bg-white">
-          <button onClick={onHome} className="flex items-center gap-3 mb-5 w-full hover:opacity-80 transition-opacity group">
+          <button onClick={onHome} className="flex items-center gap-3 w-full hover:opacity-80 transition-opacity group">
             <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shadow-lg shadow-slate-900/20 group-hover:scale-105 transition-transform">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <span className="text-lg font-bold text-slate-900 tracking-tight">AI Xodim</span>
           </button>
-          <button onClick={onNew} className="w-full bg-slate-900 hover:bg-black text-white font-medium py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md active:scale-[0.98]">
-            <Plus className="w-4 h-4" />
-            <span>Yangi Chat</span>
-          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 custom-scrollbar" onClick={() => setMenuOpenId(null)}>
+          <button
+            onClick={onNew}
+            className="w-full flex items-center gap-3 px-4 py-3 mb-3 bg-slate-900 text-white rounded-xl hover:bg-black transition-all shadow-md hover:shadow-lg active:scale-98 font-medium"
+          >
+            <Plus className="w-4.5 h-4.5" />
+            <span>Yangi chat</span>
+          </button>
+
           <div className="flex items-center gap-2 px-3 py-3 mb-1 text-xs font-bold text-slate-400 uppercase tracking-widest">
             <MessagesSquare className="w-3.5 h-3.5" />
             <span>Tarix</span>

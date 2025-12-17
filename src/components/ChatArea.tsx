@@ -58,9 +58,37 @@ export default function ChatArea({ threadId }: { threadId: number }) {
       const res = await fetch(`/api/chat?thread_id=${threadId}`);
       const data = await res.json();
       if (Array.isArray(data)) {
-        setMessages(data.map((m: any) => ({ id: m.id.toString(), role: m.role, parts: [{ type: "text", text: m.content }] })));
+        setMessages(data.map((m: any) => {
+          const parts: any[] = [{ type: "text", text: m.content }];
+          
+          // Add tool invocations if they exist
+          if (m.toolInvocations && Array.isArray(m.toolInvocations)) {
+            for (const toolInv of m.toolInvocations) {
+              parts.push({
+                type: "tool-invocation",
+                toolInvocation: {
+                  toolCallId: toolInv.toolCallId,
+                  toolName: toolInv.toolName,
+                  args: toolInv.args,
+                  state: toolInv.state || "result",
+                  result: toolInv.result
+                }
+              });
+            }
+          }
+          
+          return { 
+            id: m.id.toString(), 
+            role: m.role, 
+            parts 
+          };
+        }));
       }
-    } catch { setError({ type: "network", message: "Xabarlarni yuklashda xatolik." }); }
+      return true;
+    } catch { 
+      setError({ type: "network", message: "Xabarlarni yuklashda xatolik." }); 
+      return false;
+    }
   };
 
   useEffect(() => {
@@ -68,19 +96,8 @@ export default function ChatArea({ threadId }: { threadId: number }) {
     setMessages([]);
     setError(null);
     loadMessages(); 
-    loadSheets(); 
+    loadSheets();
   }, [threadId]); // eslint-disable-line
-
-  useEffect(() => {
-    const pendingMsg = sessionStorage.getItem(`pendingMessage_${threadId}`);
-    if (pendingMsg && status === "ready") {
-      sessionStorage.removeItem(`pendingMessage_${threadId}`);
-      // Send immediately without delay
-      setTimeout(() => {
-        sendMessage({ text: pendingMsg });
-      }, 100);
-    }
-  }, [threadId, status, sendMessage]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, status]);
   useEffect(() => { if (messages.length > 0 && status === "ready") setError(null); }, [messages, status]);
@@ -216,7 +233,7 @@ export default function ChatArea({ threadId }: { threadId: number }) {
     <>
       <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8 space-y-6 bg-white">
         {!messages.length && !error ? (
-          <div className="mt-20"><EmptyState variant="chat" description="Birinchi xabaringizni yozing yoki jadvaldan ma'lumot so'rang" /></div>
+          <div className="mt-20"><EmptyState /></div>
         ) : (
           <>
             {messages.map((m: any) => (

@@ -25,8 +25,8 @@ export interface ThreadsProps {
   onNew: () => void;
   onSelect: (id: number) => void;
   onHome: () => void;
-  onRename: (id: number, newTitle: string) => void; // Yangi
-  onDelete: (id: number) => void; // Yangi
+  onRename: (id: number, newTitle: string) => void;
+  onDelete: (id: number) => void;
   isLoading?: boolean;
 }
 
