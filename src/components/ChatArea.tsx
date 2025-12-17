@@ -64,13 +64,33 @@ export default function ChatArea({ threadId }: { threadId: number }) {
           // Add tool invocations if they exist
           if (m.toolInvocations && Array.isArray(m.toolInvocations)) {
             for (const toolInv of m.toolInvocations) {
+              // Skip invalid tool invocations (missing args for confirmAction)
+              if (toolInv.toolName === 'confirmAction' && !toolInv.args) {
+                console.warn('Skipping invalid confirmAction without args:', toolInv);
+                continue;
+              }
+
+              // Determine correct state based on tool type and data
+              let state = toolInv.state;
+              
+              // If state is not explicitly saved, infer it
+              if (!state) {
+                // If there's a result, it's completed
+                if (toolInv.result !== undefined && toolInv.result !== null) {
+                  state = "result";
+                } else {
+                  // No result means it's still waiting (pending confirmation)
+                  state = "call";
+                }
+              }
+              
               parts.push({
                 type: "tool-invocation",
                 toolInvocation: {
                   toolCallId: toolInv.toolCallId,
                   toolName: toolInv.toolName,
                   args: toolInv.args,
-                  state: toolInv.state || "result",
+                  state: state,
                   result: toolInv.result
                 }
               });
@@ -99,6 +119,26 @@ export default function ChatArea({ threadId }: { threadId: number }) {
     loadSheets();
   }, [threadId]); // eslint-disable-line
 
+  // Reload sheets after successful action execution
+  useEffect(() => {
+    if (status === "ready" && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg?.role === "assistant" && lastMsg?.parts) {
+        const hasExecutedAction = lastMsg.parts.some((p: any) => {
+          if (p.type === "tool-invocation") {
+            const inv = p.toolInvocation;
+            return inv.toolName === "executeConfirmedAction" && inv.state === "result" && inv.result?.success;
+          }
+          return false;
+        });
+        if (hasExecutedAction) {
+          console.log("🔄 Reloading sheets after action execution");
+          loadSheets();
+        }
+      }
+    }
+  }, [status, messages]); // eslint-disable-line
+
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, status]);
   useEffect(() => { if (messages.length > 0 && status === "ready") setError(null); }, [messages, status]);
   useEffect(() => { if (status === "streaming") { clearTimeout(timeoutRef.current!); setIsWaiting(false); } }, [status]);
@@ -107,8 +147,13 @@ export default function ChatArea({ threadId }: { threadId: number }) {
   const loadSheets = async () => {
     try {
       const res = await fetch("/api/excel/sheets");
-      if (res.ok) setSheets((await res.json()).sheets || []);
+      if (res.ok) {
+        const result = await res.json();
+        setSheets(result.sheets || []);
+        return result.sheets || [];
+      }
     } catch {}
+    return [];
   };
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
@@ -216,9 +261,17 @@ export default function ChatArea({ threadId }: { threadId: number }) {
     }
 
     if (toolName === "showTable" && (toolArgs.state === "call" || toolArgs.state === "result" || toolArgs.state === "input-available" || toolArgs.state === "output-available") && args) {
+      const handleShowTable = async () => {
+        // Fetch fresh data from server
+        const freshSheets = await loadSheets();
+        const sheetData = freshSheets.find((s: any) => s.name === args.sheet);
+        const dataToShow = sheetData ? sheetData.data : args.data;
+        setTablePreview({ isOpen: true, sheet: args.sheet, data: dataToShow });
+      };
+      
       return (
         <div key={callId} className="mt-2">
-          <button onClick={() => setTablePreview({ isOpen: true, sheet: args.sheet, data: args.data })} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-emerald-200 rounded-xl text-emerald-700 hover:bg-emerald-50 transition-colors shadow-sm font-medium">
+          <button onClick={handleShowTable} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-emerald-200 rounded-xl text-emerald-700 hover:bg-emerald-50 transition-colors shadow-sm font-medium">
             <Table className="w-4.5 h-4.5" />
             <span className="font-medium">Jadvalni ko&apos;rish: {args.sheet}</span>
           </button>

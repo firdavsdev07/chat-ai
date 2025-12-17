@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { Table, X, Info, Check } from "lucide-react";
+import { Table, X, Info, Check, RefreshCw } from "lucide-react";
 import ExcelGrid from "@/components/ExcelGrid";
 import type { RangeResult } from "@/hooks/useRangeSelection";
 
@@ -15,8 +15,35 @@ export interface TableModalProps {
 
 export default function TableModal({ isOpen, data, sheet, onSelectRange, onClose }: TableModalProps) {
   const [selection, setSelection] = useState<RangeResult | null>(null);
+  const [currentData, setCurrentData] = useState(data);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => { if (!isOpen) setSelection(null); }, [isOpen]);
+
+  // Update data when prop changes
+  useEffect(() => {
+    setCurrentData(data);
+  }, [data]);
+
+  // Refresh data from server
+  const refreshData = useCallback(async () => {
+    if (!sheet) return;
+    setIsRefreshing(true);
+    try {
+      const res = await fetch("/api/excel/sheets");
+      if (res.ok) {
+        const result = await res.json();
+        const sheetData = result.sheets?.find((s: any) => s.name === sheet);
+        if (sheetData) {
+          setCurrentData(sheetData.data);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to refresh data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [sheet]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape" && isOpen) onClose(); };
@@ -61,9 +88,19 @@ export default function TableModal({ isOpen, data, sheet, onSelectRange, onClose
               <p className="text-sm text-slate-500">Jadval ma'lumotlarini tanlash</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-900 flex items-center justify-center transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={refreshData}
+              disabled={isRefreshing}
+              className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-900 flex items-center justify-center transition-colors disabled:opacity-50"
+              title="Ma'lumotlarni yangilash"
+            >
+              <RefreshCw className={`w-4.5 h-4.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <button onClick={onClose} className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-900 flex items-center justify-center transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-4 px-6 py-3 bg-slate-50 border-b border-slate-100">
@@ -81,7 +118,7 @@ export default function TableModal({ isOpen, data, sheet, onSelectRange, onClose
         </div>
 
         <div className="flex-1 p-6 overflow-hidden min-h-[300px] bg-slate-50/50">
-          <ExcelGrid data={data} onSelectionChange={setSelection} maxHeight="500px" />
+          <ExcelGrid data={currentData} onSelectionChange={setSelection} maxHeight="500px" />
         </div>
 
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-white">

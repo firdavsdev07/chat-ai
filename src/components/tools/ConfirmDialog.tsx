@@ -35,7 +35,19 @@ export default function ConfirmDialog({ toolCallId, args, addToolResult }: Confi
     });
   };
 
+  // Defensive: handle missing or malformed args
+  if (!args || typeof args !== 'object') {
+    console.error('ConfirmDialog: Invalid args', args);
+    return null;
+  }
+
   const { actionTitle, actionDescription, actionType, params } = args;
+  
+  if (!actionTitle || !actionType) {
+    console.error('ConfirmDialog: Missing required fields', args);
+    return null;
+  }
+
   const style = actionStyles[actionType as keyof typeof actionStyles] || actionStyles.deleteThread;
   const Icon = style.icon;
 
