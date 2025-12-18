@@ -11,7 +11,7 @@ import {
 
 export const maxDuration = 30;
 
-const SYSTEM_PROMPT = `You are an AI assistant that works with Excel files. Communicate in Uzbek/Russian.
+const SYSTEM_PROMPT = `You are an AI assistant that works with Excel files. Communicate in Russian/English.
 
 KEY RULES:
 1. When user wants to modify data (add/update/delete) → CALL confirmAction tool immediately
@@ -25,16 +25,16 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const threadId = searchParams.get("thread_id");
   if (!threadId)
-    return Response.json({ error: "thread_id kerak" }, { status: 400 });
+    return Response.json({ error: "требуется thread_id" }, { status: 400 });
 
   const messages = db
     .query("SELECT * FROM messages WHERE thread_id = ? ORDER BY id ASC")
     .all(threadId) as Array<{
-    id: number;
-    role: string;
-    content: string;
-    tool_invocations: string | null;
-  }>;
+      id: number;
+      role: string;
+      content: string;
+      tool_invocations: string | null;
+    }>;
 
   const parsedMessages = messages.map((msg) => ({
     id: msg.id,
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   const { searchParams } = new URL(req.url);
   const threadId = searchParams.get("id");
   if (!threadId)
-    return Response.json({ error: "thread_id kerak" }, { status: 400 });
+    return Response.json({ error: "требуется thread_id" }, { status: 400 });
 
   const lastMessage = messages[messages.length - 1];
   if (lastMessage.role === "user") {
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
       model: openai("gpt-4o-mini"),
       system: SYSTEM_PROMPT,
       messages: convertToModelMessages(messages),
-      // @ts-expect-error - maxSteps exists but not in type definition
+      // @ts-expect-error
       maxSteps: 10,
       temperature: 0.7,
       maxRetries: 2,
@@ -121,10 +121,9 @@ export async function POST(req: Request) {
               for (const call of toolCalls) {
                 if (call.toolName === "confirmAction") {
                   const callArgs = (call as any).args;
-                  
-                  // CRITICAL: Skip if args is missing (Groq API bug)
+
                   if (!callArgs || typeof callArgs !== 'object' || !callArgs.actionType) {
-                    console.error('⚠️ Skipping confirmAction without valid args:', call);
+                    console.error('Skipping confirmAction without valid args:', call);
                     continue;
                   }
 

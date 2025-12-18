@@ -23,8 +23,6 @@ export default function ConfirmDialog({ toolCallId, args, addToolResult }: Confi
 
   const handleConfirm = () => {
     startTransition(() => {
-      // Send confirmation result to AI
-      // AI will then automatically call executeConfirmedAction with the params
       addToolResult({ 
         result: JSON.stringify({ 
           status: "confirmed",
@@ -35,7 +33,6 @@ export default function ConfirmDialog({ toolCallId, args, addToolResult }: Confi
     });
   };
 
-  // Defensive: handle missing or malformed args
   if (!args || typeof args !== 'object') {
     console.error('ConfirmDialog: Invalid args', args);
     return null;
@@ -62,11 +59,11 @@ export default function ConfirmDialog({ toolCallId, args, addToolResult }: Confi
           <p className="text-sm text-slate-500 mt-1">{actionDescription}</p>
           {(params?.cell || params?.value) && (
             <div className="mt-3 px-3 py-2 bg-white rounded-lg text-xs text-slate-500 space-y-0.5 border border-slate-200/60 shadow-sm">
-              {params.sheet && <div>Jadval: <span className="text-slate-900 font-medium">{params.sheet}</span></div>}
-              {params.cell && <div>Katak: <span className="text-slate-900 font-medium">{params.cell}</span></div>}
-              {params.value && <div>Qiymat: <span className="text-emerald-600 font-medium">{params.value}</span></div>}
-              {params.rowIndex && <div>Qator: <span className="text-slate-900 font-medium">{params.rowIndex}</span></div>}
-              {params.rowData && <div>Ma&apos;lumot: <span className="text-slate-600 text-xs">{JSON.stringify(params.rowData)}</span></div>}
+              {params.sheet && <div>Таблица: <span className="text-slate-900 font-medium">{params.sheet}</span></div>}
+              {params.cell && <div>Ячейка: <span className="text-slate-900 font-medium">{params.cell}</span></div>}
+              {params.value && <div>Значение: <span className="text-emerald-600 font-medium">{params.value}</span></div>}
+              {params.rowIndex && <div>Строка: <span className="text-slate-900 font-medium">{params.rowIndex}</span></div>}
+              {params.rowData && <div>Данные: <span className="text-slate-600 text-xs">{JSON.stringify(params.rowData)}</span></div>}
             </div>
           )}
           <div className="flex gap-3 mt-4">
@@ -75,7 +72,7 @@ export default function ConfirmDialog({ toolCallId, args, addToolResult }: Confi
               disabled={isPending} 
               className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
             >
-              Bekor qilish
+              Отмена
             </button>
             <button 
               onClick={handleConfirm} 
@@ -83,14 +80,14 @@ export default function ConfirmDialog({ toolCallId, args, addToolResult }: Confi
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-black rounded-lg transition-colors shadow-sm"
             >
               {isPending && <Loader2 className="w-3 h-3 animate-spin" />}
-              Tasdiqlash
+              Подтвердить
             </button>
           </div>
         </div>
       </div>
       <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-3 pt-2">
         <AlertTriangle className="w-3.5 h-3.5" />
-        <span>Bu amalni qaytarib bo'lmaydi</span>
+        <span>Это действие необратимо</span>
       </div>
     </div>
   );

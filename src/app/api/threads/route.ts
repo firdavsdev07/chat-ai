@@ -19,13 +19,13 @@ export async function PUT(req: Request) {
     const { id, title } = await req.json();
     
     if (!id || !title) {
-      return NextResponse.json({ error: "id va title kerak" }, { status: 400 });
+      return NextResponse.json({ error: "требуется id и title" }, { status: 400 });
     }
     
     db.run("UPDATE threads SET title = ? WHERE id = ?", [title, id]);
     return NextResponse.json({ id, title, success: true });
   } catch (error) {
-    return NextResponse.json({ error: "Thread yangilashda xatolik" }, { status: 500 });
+    return NextResponse.json({ error: "Ошибка при обновлении беседы" }, { status: 500 });
   }
 }
 
@@ -35,16 +35,14 @@ export async function DELETE(req: Request) {
     const id = searchParams.get("id");
     
     if (!id) {
-      return NextResponse.json({ error: "id kerak" }, { status: 400 });
+      return NextResponse.json({ error: "требуется id" }, { status: 400 });
     }
     
-    // Avval threadga tegishli xabarlarni o'chirish
     db.run("DELETE FROM messages WHERE thread_id = ?", [id]);
-    // Keyin threadni o'chirish
     db.run("DELETE FROM threads WHERE id = ?", [id]);
     
     return NextResponse.json({ id: parseInt(id), success: true });
   } catch (error) {
-    return NextResponse.json({ error: "Thread o'chirishda xatolik" }, { status: 500 });
+    return NextResponse.json({ error: "Ошибка при удалении беседы" }, { status: 500 });
   }
 }

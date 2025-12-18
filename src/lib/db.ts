@@ -1,18 +1,18 @@
-// @ts-ignore - Bun runtime type'lari build paytida mavjud emas
+// @ts-ignore - Типы Bun runtime недоступны во время сборки
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "fs";
 
-// data folder'ini yaratadi (agar yo'q bo'lsa)
+// Создаёт папку data (если не существует)
 try {
   mkdirSync("data", { recursive: true });
 } catch (error) {
-  // Folder mavjud bo'lsa, xatolikni e'tiborsiz qoldiradi
+  // Если папка существует, игнорируем ошибку
 }
 
-// SQLite faylini yaratadi (agar yo'q bo'lsa)
+// Создаёт файл SQLite (если не существует)
 export const db = new Database("data/chat.sqlite");
 
-// Threads jadvali
+// Таблица бесед
 db.run(`
   CREATE TABLE IF NOT EXISTS threads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,7 +20,7 @@ db.run(`
   )
 `);
 
-// Messages jadvali
+// Таблица сообщений
 db.run(`
   CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

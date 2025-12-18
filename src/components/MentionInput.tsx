@@ -19,7 +19,7 @@ interface MentionInputProps {
   onStop?: () => void;
 }
 
-export default function MentionInput({ value, onChange, onSubmit, disabled = false, placeholder = "Xabar yozing...", sheets = [], onMentionsChange, isStreaming = false, onStop }: MentionInputProps) {
+export default function MentionInput({ value, onChange, onSubmit, disabled = false, placeholder = "Напишите сообщение...", sheets = [], onMentionsChange, isStreaming = false, onStop }: MentionInputProps) {
   const [cursor, setCursor] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSheet, setSelectedSheet] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export default function MentionInput({ value, onChange, onSubmit, disabled = fal
             {hasMentions && (
               <div className="px-4 pt-3 pb-1 flex items-center gap-2 text-xs font-semibold text-blue-600 bg-blue-50/50 rounded-t-2xl border-b border-blue-100/50">
                 <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>{parseMentions(value).length} ta havola biriktirildi</span>
+                <span>Прикреплено ссылок: {parseMentions(value).length}</span>
               </div>
             )}
 
@@ -97,7 +97,7 @@ export default function MentionInput({ value, onChange, onSubmit, disabled = fal
                   onClick={openTableModal}
                   disabled={disabled}
                   className="w-9 h-9 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 flex items-center justify-center transition-all disabled:opacity-50"
-                  title="Excel jadvalidan tanlash (Ctrl+M)"
+                  title="Выбрать из таблицы Excel (Ctrl+M)"
                 >
                   <Table className="w-4.5 h-4.5" />
                 </button>
@@ -108,7 +108,7 @@ export default function MentionInput({ value, onChange, onSubmit, disabled = fal
                   type="button"
                   onClick={onStop}
                   className="w-9 h-9 rounded-xl bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all shadow-md active:scale-95 animate-pulse"
-                  title="Javobni to'xtatish"
+                  title="Остановить ответ"
                 >
                   <StopCircle className="w-4 h-4" />
                 </button>
@@ -129,10 +129,10 @@ export default function MentionInput({ value, onChange, onSubmit, disabled = fal
           {isStreaming ? (
             <span className="flex items-center justify-center gap-2">
               <span className="inline-block w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
-              AI javob yozmoqda...
+              AI печатает ответ...
             </span>
           ) : (
-            "Enter - yuborish • Shift+Enter - qator tashlash"
+            "Enter - отправить • Shift+Enter - новая строка"
           )}
         </p>
       </form>
@@ -144,7 +144,7 @@ export default function MentionInput({ value, onChange, onSubmit, disabled = fal
               <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
                 <FileSpreadsheet className="w-4 h-4" />
               </div>
-              <span className="text-base font-bold text-slate-900">Jadvalni tanlang</span>
+              <span className="text-base font-bold text-slate-900">Выберите таблицу</span>
             </div>
             <div className="p-2 space-y-1">
               {sheets.map((s) => (
@@ -155,7 +155,7 @@ export default function MentionInput({ value, onChange, onSubmit, disabled = fal
                 >
                   <Table className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
                   <span className="flex-1 text-sm font-medium text-slate-700 group-hover:text-slate-900">{s.name}</span>
-                  <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{s.data.length} qator</span>
+                  <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{s.data.length} строк</span>
                 </button>
               ))}
             </div>
