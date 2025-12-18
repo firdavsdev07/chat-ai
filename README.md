@@ -47,7 +47,7 @@ bun install
 
 3. Создайте файл `.env.local` и добавьте ваш API ключ:
 ```env
-GOOGLE_GENERATIVE_AI_API_KEY=your_api_key_here
+OPENAI_API_KEY=your_api_key_here
 ```
 
 4. Убедитесь, что файл `data/example.xlsx` существует в корне проекта.
