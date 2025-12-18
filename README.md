@@ -36,8 +36,8 @@
 
 1. Клонируйте репозиторий:
 ```bash
-git clone <repository-url>
-cd ai-chat-test2
+git clone https://github.com/firdavsdev07/chat-ai
+cd chat-ai
 ```
 
 2. Установите зависимости:
