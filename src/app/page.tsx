@@ -73,7 +73,7 @@ function HomeContent() {
       const res = await fetch("/api/threads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "Yangi suhbat" })
+        body: JSON.stringify({ title: "Новая беседа" })
       });
       if (res.ok) {
         const newThread = await res.json();

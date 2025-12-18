@@ -28,21 +28,21 @@ function DeleteDialog({ isOpen, title, onConfirm, onCancel }: {
             <AlertTriangle className="w-6 h-6 text-red-600" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Chatni o'chirish</h3>
-            <p className="text-sm text-slate-500">Bu amalni qaytarib bo'lmaydi</p>
+            <h3 className="text-lg font-bold text-slate-900">Удалить чат</h3>
+            <p className="text-sm text-slate-500">Это действие необратимо</p>
           </div>
         </div>
         <div className="p-5">
           <p className="text-sm text-slate-600">
-            <span className="font-semibold text-slate-900">"{title}"</span> nomli chat va undagi barcha xabarlar o'chiriladi.
+            Чат <span className="font-semibold text-slate-900">"{title}"</span> и все сообщения в нём будут удалены.
           </p>
         </div>
         <div className="flex gap-3 p-5 pt-0">
           <button onClick={onCancel} className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
-            Bekor qilish
+            Отмена
           </button>
           <button onClick={onConfirm} className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors shadow-sm">
-            O'chirish
+            Удалить
           </button>
         </div>
       </div>
@@ -88,7 +88,7 @@ export default function Threads({ threads, activeId, onNew, onSelect, onHome, on
   const handleDeleteClick = (e: React.MouseEvent, id: number, title: string) => {
     e.stopPropagation();
     setMenuOpenId(null);
-    setDeleteDialog({ isOpen: true, id, title: title || "Nomsiz suhbat" });
+    setDeleteDialog({ isOpen: true, id, title: title || "Безымянная беседа" });
   };
 
   return (
@@ -106,7 +106,7 @@ export default function Threads({ threads, activeId, onNew, onSelect, onHome, on
             <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shadow-lg shadow-slate-900/20 group-hover:scale-105 transition-transform">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <span className="text-lg font-bold text-slate-900 tracking-tight">AI Xodim</span>
+            <span className="text-lg font-bold text-slate-900 tracking-tight">AI Помощник</span>
           </button>
         </div>
 
@@ -116,12 +116,12 @@ export default function Threads({ threads, activeId, onNew, onSelect, onHome, on
             className="w-full flex items-center gap-3 px-4 py-3 mb-3 bg-slate-900 text-white rounded-xl hover:bg-black transition-all shadow-md hover:shadow-lg active:scale-98 font-medium"
           >
             <Plus className="w-4.5 h-4.5" />
-            <span>Yangi chat</span>
+            <span>Новый чат</span>
           </button>
 
           <div className="flex items-center gap-2 px-3 py-3 mb-1 text-xs font-bold text-slate-400 uppercase tracking-widest">
             <MessagesSquare className="w-3.5 h-3.5" />
-            <span>Tarix</span>
+            <span>История</span>
           </div>
 
           {isLoading ? (
@@ -138,7 +138,7 @@ export default function Threads({ threads, activeId, onNew, onSelect, onHome, on
               <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <MessageSquare className="w-5 h-5 text-slate-400" />
               </div>
-              <p className="text-sm text-slate-500">Hozircha suhbatlar yo'q</p>
+              <p className="text-sm text-slate-500">Пока нет бесед</p>
             </div>
           ) : (
             <div className="space-y-1">
@@ -176,7 +176,7 @@ export default function Threads({ threads, activeId, onNew, onSelect, onHome, on
                     >
                       <MessageSquare className={`w-4 h-4 shrink-0 ${activeId === t.id ? "text-slate-900" : "text-slate-400 group-hover/item:text-slate-600"}`} />
                       <div className="flex-1 min-w-0 pr-2">
-                        <div className="text-sm font-medium truncate">{t.title || "Nomsiz suhbat"}</div>
+                        <div className="text-sm font-medium truncate">{t.title || "Безымянная беседа"}</div>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === t.id ? null : t.id); }}
@@ -192,10 +192,10 @@ export default function Threads({ threads, activeId, onNew, onSelect, onHome, on
                   {menuOpenId === t.id && (
                     <div ref={menuRef} className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                       <button onClick={(e) => handleStartEdit(e, t.id, t.title)} className="w-full text-left px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-2.5">
-                        <Pencil className="w-4 h-4" /> O'zgartirish
+                        <Pencil className="w-4 h-4" /> Изменить
                       </button>
                       <button onClick={(e) => handleDeleteClick(e, t.id, t.title)} className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2.5">
-                        <Trash2 className="w-4 h-4" /> O'chirish
+                        <Trash2 className="w-4 h-4" /> Удалить
                       </button>
                     </div>
                   )}
@@ -209,7 +209,7 @@ export default function Threads({ threads, activeId, onNew, onSelect, onHome, on
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 text-xs font-bold shadow-sm">AI</div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-700 truncate">Foydalanuvchi</p>
+              <p className="text-sm font-semibold text-slate-700 truncate">Пользователь</p>
               <p className="text-xs text-slate-400 truncate">Pro Plan</p>
             </div>
           </div>

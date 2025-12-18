@@ -30,16 +30,14 @@ export default function ChatArea({ threadId }: { threadId: number }) {
   const { messages, sendMessage, status, setMessages, addToolOutput, reload, stop } = useChat({
     transport: new DefaultChatTransport({ api: `/api/chat?id=${threadId}` }),
     id: threadId.toString(),
-    // DO NOT auto-send for confirmAction - wait for user button click
     sendAutomaticallyWhen: (message: any) => {
-      // Check if last assistant message has confirmAction tool call waiting for result
       const lastMsg = message;
       if (lastMsg?.role === 'assistant' && lastMsg?.parts) {
         for (const part of lastMsg.parts) {
           if (part.type === 'tool-invocation' || part.type === 'tool-call') {
             const toolInv = part.toolInvocation || part;
             if (toolInv.toolName === 'confirmAction' && (!toolInv.state || toolInv.state === 'call')) {
-              return false; // Don't auto-send, wait for user confirmation
+              return false; 
             }
           }
         }
@@ -49,7 +47,7 @@ export default function ChatArea({ threadId }: { threadId: number }) {
     onError: () => {
       clearTimeout(timeoutRef.current!);
       setIsWaiting(false);
-      setError({ type: "server", message: "AI xizmati bilan bog'lanishda xatolik.", lastUserMessage: lastMsgRef.current });
+      setError({ type: "server", message: "Ошибка при подключении к AI сервису.", lastUserMessage: lastMsgRef.current });
     },
   }) as any;
 
@@ -61,16 +59,30 @@ export default function ChatArea({ threadId }: { threadId: number }) {
         setMessages(data.map((m: any) => {
           const parts: any[] = [{ type: "text", text: m.content }];
           
-          // Add tool invocations if they exist
           if (m.toolInvocations && Array.isArray(m.toolInvocations)) {
             for (const toolInv of m.toolInvocations) {
+              if (toolInv.toolName === 'confirmAction' && !toolInv.args) {
+                console.warn('Skipping invalid confirmAction without args:', toolInv);
+                continue;
+              }
+
+              let state = toolInv.state;
+              
+              if (!state) {
+                if (toolInv.result !== undefined && toolInv.result !== null) {
+                  state = "result";
+                } else {
+                  state = "call";
+                }
+              }
+              
               parts.push({
                 type: "tool-invocation",
                 toolInvocation: {
                   toolCallId: toolInv.toolCallId,
                   toolName: toolInv.toolName,
                   args: toolInv.args,
-                  state: toolInv.state || "result",
+                  state: state,
                   result: toolInv.result
                 }
               });
@@ -86,18 +98,35 @@ export default function ChatArea({ threadId }: { threadId: number }) {
       }
       return true;
     } catch { 
-      setError({ type: "network", message: "Xabarlarni yuklashda xatolik." }); 
+      setError({ type: "network", message: "Ошибка при загрузке сообщений." }); 
       return false;
     }
   };
 
   useEffect(() => {
-    // Reset messages first when thread changes
     setMessages([]);
     setError(null);
     loadMessages(); 
     loadSheets();
   }, [threadId]); // eslint-disable-line
+  useEffect(() => {
+    if (status === "ready" && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg?.role === "assistant" && lastMsg?.parts) {
+        const hasExecutedAction = lastMsg.parts.some((p: any) => {
+          if (p.type === "tool-invocation") {
+            const inv = p.toolInvocation;
+            return inv.toolName === "executeConfirmedAction" && inv.state === "result" && inv.result?.success;
+          }
+          return false;
+        });
+        if (hasExecutedAction) {
+          console.log("🔄 Reloading sheets after action execution");
+          loadSheets();
+        }
+      }
+    }
+  }, [status, messages]); 
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, status]);
   useEffect(() => { if (messages.length > 0 && status === "ready") setError(null); }, [messages, status]);
@@ -107,8 +136,13 @@ export default function ChatArea({ threadId }: { threadId: number }) {
   const loadSheets = async () => {
     try {
       const res = await fetch("/api/excel/sheets");
-      if (res.ok) setSheets((await res.json()).sheets || []);
+      if (res.ok) {
+        const result = await res.json();
+        setSheets(result.sheets || []);
+        return result.sheets || [];
+      }
     } catch {}
+    return [];
   };
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
@@ -121,7 +155,7 @@ export default function ChatArea({ threadId }: { threadId: number }) {
     timeoutRef.current = setTimeout(() => {
       setIsWaiting(false);
       stop();
-      setError({ type: "timeout", message: "AI javob bermadi. Qayta urinib ko'ring.", lastUserMessage: text });
+      setError({ type: "timeout", message: "AI не ответил. Попробуйте снова.", lastUserMessage: text });
     }, AI_TIMEOUT_MS);
     sendMessage({ text });
     setInput("");
@@ -135,22 +169,17 @@ export default function ChatArea({ threadId }: { threadId: number }) {
       timeoutRef.current = setTimeout(() => {
         setIsWaiting(false);
         stop();
-        setError({ type: "timeout", message: "AI javob bermadi.", lastUserMessage: lastMsgRef.current });
+        setError({ type: "timeout", message: "AI не ответил.", lastUserMessage: lastMsgRef.current });
       }, AI_TIMEOUT_MS);
       sendMessage({ text: error.lastUserMessage });
     } else reload();
   }, [error, sendMessage, reload, stop]);
 
-  // isLoading should be true when:
-  // 1. AI is streaming
-  // 2. Waiting for response (timeout)
-  // 3. Waiting for tool confirmation/result (status === "awaiting_message")
+ 
   const isLoading = status === "streaming" || status === "awaiting_message" || isWaiting;
   
-  // Check if AI is actively writing (not just waiting for tool result)
   const isActuallyStreaming = status === "streaming" && messages.length > 0 && messages[messages.length - 1]?.role === "assistant";
   
-  // Debug: Log status changes
   useEffect(() => {
     console.log("🔄 ChatArea status:", status, "isWaiting:", isWaiting, "isLoading:", isLoading);
   }, [status, isWaiting, isLoading]);
@@ -160,14 +189,13 @@ export default function ChatArea({ threadId }: { threadId: number }) {
     const args = toolArgs.args || toolArgs.input;
     const result = toolArgs.result || toolArgs.output;
 
-    // Excel read tools loading states
     const excelReadTools = ["getRange", "getCell", "getSheetData", "listSheets", "getCellFormula", "explainFormula"];
     if (excelReadTools.includes(toolName)) {
       if (toolArgs.state === "partial-call" || toolArgs.state === "input-streaming" || toolArgs.state === "call") {
         return (
           <div key={callId} className="mt-2 px-3 py-2 bg-purple-50 border border-purple-100 rounded-lg flex items-center gap-2">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-500" />
-            <span className="text-sm font-medium text-purple-700">Excel ma&apos;lumotlari o&apos;qilmoqda...</span>
+            <span className="text-sm font-medium text-purple-700">Чтение данных Excel...</span>
           </div>
         );
       }
@@ -178,7 +206,7 @@ export default function ChatArea({ threadId }: { threadId: number }) {
         return (
           <div key={callId} className="mt-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg flex items-center gap-2">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
-            <span className="text-sm font-medium text-blue-700">Tasdiqlash so'rovi tayyorlanmoqda...</span>
+            <span className="text-sm font-medium text-blue-700">Подготовка запроса подтверждения...</span>
           </div>
         );
       }
@@ -191,7 +219,7 @@ export default function ChatArea({ threadId }: { threadId: number }) {
         return (
           <div key={callId} className={`mt-2 px-3 py-2 rounded-lg text-sm flex items-center gap-2 border font-medium ${ok ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-red-50 text-red-700 border-red-100"}`}>
             {ok ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-            {ok ? "Tasdiqlandi" : "Bekor qilindi"}
+            {ok ? "Подтверждено" : "Отменено"}
           </div>
         );
       }
@@ -210,17 +238,25 @@ export default function ChatArea({ threadId }: { threadId: number }) {
       return (
         <div key={callId} className="mt-2 px-3 py-2 bg-amber-50 border border-amber-100 rounded-lg flex items-center gap-2">
           <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
-          <span className="text-sm font-medium text-amber-700">Amal bajarilmoqda...</span>
+          <span className="text-sm font-medium text-amber-700">Выполнение операции...</span>
         </div>
       );
     }
 
     if (toolName === "showTable" && (toolArgs.state === "call" || toolArgs.state === "result" || toolArgs.state === "input-available" || toolArgs.state === "output-available") && args) {
+      const handleShowTable = async () => {
+        // Fetch fresh data from server
+        const freshSheets = await loadSheets();
+        const sheetData = freshSheets.find((s: any) => s.name === args.sheet);
+        const dataToShow = sheetData ? sheetData.data : args.data;
+        setTablePreview({ isOpen: true, sheet: args.sheet, data: dataToShow });
+      };
+      
       return (
         <div key={callId} className="mt-2">
-          <button onClick={() => setTablePreview({ isOpen: true, sheet: args.sheet, data: args.data })} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-emerald-200 rounded-xl text-emerald-700 hover:bg-emerald-50 transition-colors shadow-sm font-medium">
+          <button onClick={handleShowTable} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-emerald-200 rounded-xl text-emerald-700 hover:bg-emerald-50 transition-colors shadow-sm font-medium">
             <Table className="w-4.5 h-4.5" />
-            <span className="font-medium">Jadvalni ko&apos;rish: {args.sheet}</span>
+            <span className="font-medium">Показать таблицу: {args.sheet}</span>
           </button>
         </div>
       );
@@ -243,7 +279,7 @@ export default function ChatArea({ threadId }: { threadId: number }) {
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center border shadow-sm ${m.role === "user" ? "bg-slate-100 border-slate-200" : "bg-white border-slate-200"}`}>
                       {m.role === "user" ? <User className="w-3.5 h-3.5 text-slate-600" /> : <Sparkles className="w-3.5 h-3.5 text-slate-900" />}
                     </div>
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{m.role === "user" ? "Siz" : "AI Xodim"}</span>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{m.role === "user" ? "Вы" : "AI Помощник"}</span>
                   </div>
                   <div className={`px-5 py-3.5 rounded-2xl shadow-sm text-[15px] leading-relaxed ${
                     m.role === "user" 

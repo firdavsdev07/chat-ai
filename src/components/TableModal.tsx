@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { Table, X, Info, Check } from "lucide-react";
+import { Table, X, Info, Check, RefreshCw } from "lucide-react";
 import ExcelGrid from "@/components/ExcelGrid";
 import type { RangeResult } from "@/hooks/useRangeSelection";
 
@@ -15,8 +15,35 @@ export interface TableModalProps {
 
 export default function TableModal({ isOpen, data, sheet, onSelectRange, onClose }: TableModalProps) {
   const [selection, setSelection] = useState<RangeResult | null>(null);
+  const [currentData, setCurrentData] = useState(data);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => { if (!isOpen) setSelection(null); }, [isOpen]);
+
+  // Update data when prop changes
+  useEffect(() => {
+    setCurrentData(data);
+  }, [data]);
+
+  // Refresh data from server
+  const refreshData = useCallback(async () => {
+    if (!sheet) return;
+    setIsRefreshing(true);
+    try {
+      const res = await fetch("/api/excel/sheets");
+      if (res.ok) {
+        const result = await res.json();
+        const sheetData = result.sheets?.find((s: any) => s.name === sheet);
+        if (sheetData) {
+          setCurrentData(sheetData.data);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to refresh data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [sheet]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape" && isOpen) onClose(); };
@@ -32,7 +59,7 @@ export default function TableModal({ isOpen, data, sheet, onSelectRange, onClose
   }, [selection, onSelectRange, onClose]);
 
   const getSelectionText = () => {
-    if (!selection) return "Katak tanlanmagan";
+    if (!selection) return "Ячейка не выбрана";
     return selection.from === selection.to ? `${sheet}!${selection.from}` : `${sheet}!${selection.from}:${selection.to}`;
   };
 
@@ -58,17 +85,27 @@ export default function TableModal({ isOpen, data, sheet, onSelectRange, onClose
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900">{sheet}</h2>
-              <p className="text-sm text-slate-500">Jadval ma'lumotlarini tanlash</p>
+              <p className="text-sm text-slate-500">Выбор данных таблицы</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-900 flex items-center justify-center transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={refreshData}
+              disabled={isRefreshing}
+              className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-900 flex items-center justify-center transition-colors disabled:opacity-50"
+              title="Обновить данные"
+            >
+              <RefreshCw className={`w-4.5 h-4.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <button onClick={onClose} className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-900 flex items-center justify-center transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-4 px-6 py-3 bg-slate-50 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-slate-500">Tanlangan soha:</span>
+            <span className="text-sm font-medium text-slate-500">Выбранная область:</span>
             <span className={`text-sm font-semibold px-2.5 py-1 rounded-md transition-colors ${selection ? "bg-white border border-slate-200 text-slate-900 shadow-sm" : "text-slate-400"}`}>
               {getSelectionText()}
             </span>
@@ -81,17 +118,17 @@ export default function TableModal({ isOpen, data, sheet, onSelectRange, onClose
         </div>
 
         <div className="flex-1 p-6 overflow-hidden min-h-[300px] bg-slate-50/50">
-          <ExcelGrid data={data} onSelectionChange={setSelection} maxHeight="500px" />
+          <ExcelGrid data={currentData} onSelectionChange={setSelection} maxHeight="500px" />
         </div>
 
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-white">
           <div className="flex items-center gap-2 text-sm text-slate-400 hidden sm:flex">
             <Info className="w-4 h-4" />
-            <span>Sichqoncha bilan tortib tanlang</span>
+            <span>Выделите мышью нужные ячейки</span>
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
             <button onClick={onClose} className="flex-1 sm:flex-none px-5 py-2.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-              Bekor qilish
+              Отмена
             </button>
             <button
               onClick={handleConfirm}
@@ -99,7 +136,7 @@ export default function TableModal({ isOpen, data, sheet, onSelectRange, onClose
               className="flex-1 sm:flex-none px-6 py-2.5 text-sm font-medium text-white bg-slate-900 rounded-xl hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
             >
               <Check className="w-4 h-4" />
-              Tanlash
+              Выбрать
             </button>
           </div>
         </div>

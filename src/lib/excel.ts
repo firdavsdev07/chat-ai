@@ -216,7 +216,7 @@ export function addRow(sheet: string, rowIndex: number, rowData: any[]): void {
 
   const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
 
-  // Agar rowIndex judayam katta bo'lsa, oxiriga qo'shish
+  // Если rowIndex слишком большой, добавляем в конец
   if (rowIndex > data.length) rowIndex = data.length;
 
   data.splice(rowIndex, 0, rowData);
@@ -235,7 +235,7 @@ export function updateCell(sheet: string, cell: string, value: string | number |
   const cellRef = cell.toUpperCase();
   const cellAddress = XLSX.utils.decode_cell(cellRef);
 
-  // Xavfsizlik: Juda uzoq kataklarga yozishni oldini olish
+  // Безопасность: предотвращение записи в слишком дальние ячейки
   if (cellAddress.r > 20000) throw new Error("Row limit exceeded (max 20000)");
   if (cellAddress.c > 1000) throw new Error("Column limit exceeded (max 1000)");
   
@@ -252,7 +252,7 @@ export function updateCell(sheet: string, cell: string, value: string | number |
   
   const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
   
-  // Range ni kengaytirish
+  // Расширение диапазона
   if (range.s.r > cellAddress.r) range.s.r = cellAddress.r;
   if (range.s.c > cellAddress.c) range.s.c = cellAddress.c;
   if (range.e.r < cellAddress.r) range.e.r = cellAddress.r;

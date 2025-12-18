@@ -40,7 +40,7 @@ export default function ExcelGrid({ data, onSelectionChange, maxHeight = "400px"
   const formatValue = (v: string | number | boolean | null) => v === null ? "" : typeof v === "boolean" ? (v ? "TRUE" : "FALSE") : String(v);
   const colCount = data.length > 0 ? Math.max(...data.map(r => r.length)) : 0;
 
-  if (!data.length) return <div className="flex items-center justify-center h-40 text-slate-500">Ma&apos;lumot topilmadi</div>;
+  if (!data.length) return <div className="flex items-center justify-center h-40 text-slate-500">Данные не найдены</div>;
 
   return (
     <div className="overflow-auto border border-slate-200 rounded-lg bg-white shadow-sm custom-scrollbar" style={{ maxHeight }}>

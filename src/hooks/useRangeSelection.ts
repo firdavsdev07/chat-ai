@@ -1,12 +1,4 @@
-/**
- * Custom hook for Excel-like range selection
- * Handles cell and range selection with mouse drag
- */
 import { useState, useCallback, useRef } from "react";
-
-// ============================================
-// TYPE DEFINITIONS
-// ============================================
 
 export interface CellPosition {
   row: number;
@@ -19,17 +11,10 @@ export interface SelectionRange {
 }
 
 export interface RangeResult {
-  from: string; // e.g., "A1"
-  to: string;   // e.g., "C5"
+  from: string; 
+  to: string;   
 }
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-/**
- * Convert column index to Excel letter (0 = A, 1 = B, ..., 25 = Z, 26 = AA)
- */
 export function indexToCol(index: number): string {
   let result = "";
   let i = index + 1;
@@ -41,23 +26,16 @@ export function indexToCol(index: number): string {
   return result;
 }
 
-/**
- * Convert row index to Excel row number (0 = 1, 1 = 2, ...)
- */
+
 export function indexToRow(index: number): number {
   return index + 1;
 }
 
-/**
- * Convert cell position to Excel reference (e.g., { row: 0, col: 0 } -> "A1")
- */
 export function positionToRef(position: CellPosition): string {
   return `${indexToCol(position.col)}${indexToRow(position.row)}`;
 }
 
-/**
- * Normalize selection range so start is always top-left and end is bottom-right
- */
+
 export function normalizeRange(range: SelectionRange): SelectionRange {
   return {
     start: {
@@ -71,9 +49,7 @@ export function normalizeRange(range: SelectionRange): SelectionRange {
   };
 }
 
-/**
- * Check if a cell is within the selection range
- */
+
 export function isCellInRange(row: number, col: number, range: SelectionRange | null): boolean {
   if (!range) return false;
   
@@ -86,27 +62,19 @@ export function isCellInRange(row: number, col: number, range: SelectionRange | 
   );
 }
 
-/**
- * Check if a cell is the start of selection
- */
+
 export function isCellStart(row: number, col: number, range: SelectionRange | null): boolean {
   if (!range) return false;
   const normalized = normalizeRange(range);
   return row === normalized.start.row && col === normalized.start.col;
 }
 
-/**
- * Check if a cell is the end of selection
- */
+
 export function isCellEnd(row: number, col: number, range: SelectionRange | null): boolean {
   if (!range) return false;
   const normalized = normalizeRange(range);
   return row === normalized.end.row && col === normalized.end.col;
 }
-
-// ============================================
-// CUSTOM HOOK
-// ============================================
 
 interface UseRangeSelectionReturn {
   selection: SelectionRange | null;
@@ -126,9 +94,7 @@ export function useRangeSelection(): UseRangeSelectionReturn {
   const [isSelecting, setIsSelecting] = useState(false);
   const startCellRef = useRef<CellPosition | null>(null);
 
-  /**
-   * Get selection result as Excel range format
-   */
+
   const getSelectionResult = useCallback((): RangeResult | null => {
     if (!selection) return null;
     
@@ -136,7 +102,6 @@ export function useRangeSelection(): UseRangeSelectionReturn {
     const from = positionToRef(normalized.start);
     const to = positionToRef(normalized.end);
     
-    // If single cell, return same for from and to
     if (from === to) {
       return { from, to: from };
     }
@@ -144,9 +109,7 @@ export function useRangeSelection(): UseRangeSelectionReturn {
     return { from, to };
   }, [selection]);
 
-  /**
-   * Handle mouse down - start selection
-   */
+
   const handleMouseDown = useCallback((row: number, col: number) => {
     const startPos = { row, col };
     startCellRef.current = startPos;
@@ -157,9 +120,6 @@ export function useRangeSelection(): UseRangeSelectionReturn {
     });
   }, []);
 
-  /**
-   * Handle mouse move - extend selection
-   */
   const handleMouseMove = useCallback((row: number, col: number) => {
     if (!isSelecting || !startCellRef.current) return;
     
@@ -169,39 +129,26 @@ export function useRangeSelection(): UseRangeSelectionReturn {
     });
   }, [isSelecting]);
 
-  /**
-   * Handle mouse up - end selection
-   */
+
   const handleMouseUp = useCallback(() => {
     setIsSelecting(false);
   }, []);
 
-  /**
-   * Clear current selection
-   */
   const clearSelection = useCallback(() => {
     setSelection(null);
     setIsSelecting(false);
     startCellRef.current = null;
   }, []);
 
-  /**
-   * Check if cell is selected
-   */
+
   const isCellSelected = useCallback((row: number, col: number): boolean => {
     return isCellInRange(row, col, selection);
   }, [selection]);
 
-  /**
-   * Check if cell is selection start (top-left)
-   */
   const isCellSelectionStart = useCallback((row: number, col: number): boolean => {
     return isCellStart(row, col, selection);
   }, [selection]);
 
-  /**
-   * Check if cell is selection end (bottom-right)
-   */
   const isCellSelectionEnd = useCallback((row: number, col: number): boolean => {
     return isCellEnd(row, col, selection);
   }, [selection]);

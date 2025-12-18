@@ -1,111 +1,96 @@
-# AI Chat Application (Production Ready)
+# AI Chat Application
 
-This is a modern AI chat application built with **Next.js 16**, **Vercel AI SDK**, and **Bun SQLite**.
-It features a ChatGPT-like interface with thread management, message persistence, and advanced Excel integration tools.
+Современное приложение для чата с AI, построенное на Next.js 16, Vercel AI SDK и Bun SQLite.
+Интерфейс в стиле ChatGPT с управлением беседами, сохранением сообщений и интеграцией с Excel.
 
-## Features
+## Возможности
 
-- 💬 **AI Chat**: Powered by Google Gemini 2.5 Flash using Vercel AI SDK v5.
-- 🧵 **Thread Management**: Create, switch, and manage multiple chat threads.
-- 💾 **Persistence**: All messages and threads are saved locally using SQLite (`data/chat.sqlite`).
-- 📊 **Excel Integration**:
-  - **Read/Write**: Full read/write capabilities for Excel files.
-  - **Formula Explanation**: AI can read and explain Excel formulas.
-  - **Mention System**: Reference cells directly in chat using `@Sheet!A1` syntax.
-  - **Visual Table Modal**: Interactive grid for selecting ranges and viewing data.
-- 🛡️ **Safety & Reliability**: 
-  - Dangerous actions (delete/update) require explicit user confirmation via UI.
-  - Robust error handling, timeouts, and retry mechanisms.
-- 🎨 **Modern UX**: 
-  - Clean UI with internal state management.
-  - Real-time streaming responses with typing indicators.
-  - Lucide React icons (no emojis).
+- AI чат с поддержкой потоковых ответов
+- Управление несколькими беседами (threads)
+- Сохранение всех сообщений в локальной базе данных SQLite
+- Интеграция с Excel файлами: чтение, запись, обновление данных
+- Система упоминаний ячеек через синтаксис @Sheet!A1
+- Визуальный интерфейс для выбора диапазонов в таблицах
+- Подтверждение опасных операций через UI диалоги
+- Обработка ошибок и таймаутов
 
-## Tech Stack
+## Технологии
 
-- **Framework**: Next.js 16 (App Router)
-- **Language**: TypeScript
-- **Runtime**: Bun 1.1+
-- **Database**: SQLite (via `bun:sqlite`)
-- **AI SDK**: Vercel AI SDK (`useChat`, `streamText`)
-- **Styling**: Tailwind CSS
-- **Icons**: lucide-react
-- **Excel**: SheetJS (xlsx)
+- Next.js 16 (App Router)
+- TypeScript
+- Bun 1.1+
+- SQLite (bun:sqlite)
+- Vercel AI SDK
+- Tailwind CSS
+- Lucide React (иконки)
+- SheetJS (работа с Excel)
 
-## Getting Started
+## Установка
 
-### Prerequisites
+### Требования
 
-- [Bun](https://bun.sh) installed.
-- Google AI API Key.
+- Установленный Bun (https://bun.sh)
+- API ключ Google AI
 
-### Installation
+### Шаги установки
 
-1. **Clone the repository** (if applicable):
-   ```bash
-   git clone <repository-url>
-   cd ai-chat-test2
-   ```
+1. Клонируйте репозиторий:
+```bash
+git clone <repository-url>
+cd ai-chat-test2
+```
 
-2. **Install dependencies**:
-   ```bash
-   bun install
-   ```
+2. Установите зависимости:
+```bash
+bun install
+```
 
-3. **Environment Setup**:
-   Create a `.env.local` file in the root directory:
-   ```env
-   GOOGLE_GENERATIVE_AI_API_KEY=your_api_key_here
-   ```
+3. Создайте файл `.env.local` и добавьте ваш API ключ:
+```env
+GOOGLE_GENERATIVE_AI_API_KEY=your_api_key_here
+```
 
-4. **Data Setup**:
-   Ensure `data/example.xlsx` exists in the project root. This file is used for all Excel operations.
+4. Убедитесь, что файл `data/example.xlsx` существует в корне проекта.
 
-### Running the App
+## Запуск
 
-Start the development server:
+Запустите development сервер:
 
 ```bash
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Откройте http://localhost:3000 в браузере.
 
-## Project Structure
+## Структура проекта
 
 ```
 src/
 ├── app/
-│   ├── api/             # API Routes (Chat, Threads, Excel)
-│   └── page.tsx         # Main Layout
-├── components/          
-│   ├── ChatArea.tsx     # Main chat logic & UI
-│   ├── MentionInput.tsx # Input with @mention support
-│   ├── TableModal.tsx   # Excel Grid Modal
-│   ├── ExcelGrid.tsx    # Excel Table Implementation
-│   └── tools/           # Generative UI Components
-├── hooks/               # Custom Hooks (useMention, etc.)
+│   ├── api/             # API маршруты (Chat, Threads, Excel)
+│   └── page.tsx         # Главная страница
+├── components/          # React компоненты
+│   ├── ChatArea.tsx     # Основной чат
+│   ├── MentionInput.tsx # Ввод с поддержкой @mentions
+│   ├── TableModal.tsx   # Модальное окно с таблицей Excel
+│   └── tools/           # Компоненты для инструментов AI
+├── hooks/               # Пользовательские хуки
 ├── lib/
-│   ├── db.ts            # SQLite Database Connection
-│   ├── excel.ts         # Excel Utility Functions
+│   ├── db.ts            # Подключение к SQLite
+│   ├── excel.ts         # Функции для работы с Excel
 │   ├── actions.ts       # Server Actions
-│   └── tools.ts         # Tool Definitions (Zod Schemas)
+│   └── tools.ts         # Определения инструментов (Zod схемы)
 ```
 
-## AI Tools & Capabilities
+## Инструменты AI
 
-The AI agent has access to the following tools:
+- confirmAction - запрос подтверждения перед критическими операциями
+- listSheets / getRange - чтение данных из Excel
+- updateExcelCell - изменение данных в Excel (с подтверждением)
+- showTable - визуальное отображение данных в таблице
 
-- **`confirmAction`**: Requests user permission before critical operations.
-- **`listSheets` / `getRange`**: Tools to explore and read Excel data.
-- **`updateExcelCell`**: Modifies Excel data (requires confirmation).
-- **`showTable`**: Displays data in a visual modal instead of raw text.
+## Примечания
 
-## Development Notes
-
-- The project uses **Bun's built-in SQLite**, so no external DB setup is required.
-- All core logic is strictly typed with **TypeScript**.
-- UX is optimized for reliability: network errors and timeouts are handled gracefully.
-
----
-Built with ❤️ using Vercel AI SDK and Next.js.
+- Используется встроенная в Bun база данных SQLite, внешняя установка БД не требуется
+- Весь код строго типизирован с помощью TypeScript
+- Реализована надежная обработка ошибок сети и таймаутов

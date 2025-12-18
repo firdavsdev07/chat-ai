@@ -1,16 +1,10 @@
-/**
- * Excel Sheets API
- * Returns all sheets with their data for MentionInput
- */
 import { NextResponse } from "next/server";
 import { listSheets, getSheetData } from "@/lib/excel";
 
 export async function GET() {
   try {
-    // Get all sheet names
     const sheetInfos = listSheets();
     
-    // Load data for each sheet
     const sheets = sheetInfos.map(info => {
       try {
         const sheetData = getSheetData(info.name);
